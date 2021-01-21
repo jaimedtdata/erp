@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<openerp>
+    <data>
+
+        <record id="crm_lead_ext_view" model="ir.ui.view">
+            <field name="name">crm.lead.ext.view</field>
+            <field name="model">crm.lead</field>
+            <field name="inherit_id" ref="crm.crm_case_form_view_oppor"/>
+            <field name="arch" type="xml">
+
+                <xpath expr="//header" position="inside">
+                    <button name="create_project_ext" string="Crear Proyecto" type="object" />
+                </xpath>
+
+            </field>
+        </record>
+
+    </data>
+</openerp>
