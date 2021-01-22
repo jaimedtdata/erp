@@ -1,0 +1,42 @@
+
+<odoo>
+    <record model="ir.ui.view" id="view_planilla_import_worked_days_form">
+        <field name="name">view.planilla.import.worked.days.form</field>
+        <field name="model">planilla.import.worked.days</field>
+        <field name="arch" type="xml">
+            <form string="Importacion Dias Trabajo y entradas" version="7.0">
+                <header>
+                    <button string="Procesar Dias trabajo" name="procesa_worked_days" type="object" class="oe_highlight"/>
+                    <button string="Procesar Entradas" name="procesa_entradas" type="object" class="oe_highlight" />
+                </header>
+                <group>
+                    <group>
+                        <field name="fecha_ini" />
+                        <field name="fecha_fin" />
+                        <field name="file_imp_text" invisible="1" />
+                        <field name="file_input_lines_text" invisible="1"/>
+                        <field name="sal_name2" invisible="1"/>
+                        <field name="sal_name3" invisible="1"/>
+                    </group>
+                    <group>
+                        <field name="file_imp" string="Importador Dias Trabajo" filename="file_imp_text"/>
+                        <field name="file_input_lines" string="Importador Entradas" filename="file_input_lines_text"/>
+                        <field name="file_sal_error" string="Errores importacion dias trabajo" filename="sal_name2" />
+                        <field name="file_error_entradas" string="Errores importacion entradas" filename="sal_name3" />
+                    </group>
+                </group>
+            </form>
+        </field>
+    </record>
+
+    <record id="planilla_import_worked_days_tree" model="ir.ui.view">
+        <field name="name">planilla.import.worked.days.tree</field>
+        <field name="model">planilla.import.worked.days</field>
+        <field name="arch" type="xml">
+            <tree string="Importacion compras">
+                <field name="fecha_ini" />
+                <field name="fecha_fin" />
+            </tree>
+        </field>
+    </record>
+</odoo>

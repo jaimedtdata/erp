@@ -1,0 +1,70 @@
+<odoo>
+    <data>
+        <record id="hr_contract_view_form" model="ir.ui.view">
+            <field name="name">hr_contract_view</field>
+            <field name="model">hr.contract</field>
+            <field name="inherit_id" ref="hr_contract.hr_contract_view_form"/>
+            <field name="priority" eval="17" />
+            <field name="arch" type="xml">
+                <field name="type_id" position="replace">
+                    <field name="type_id" select="10"/>
+                </field>
+                <field name="analytic_account_id" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </field>
+                <field name="job_id" position="after">
+                    <field name="tipo_trabajador_id" />
+                </field>
+
+                <xpath expr="//form/sheet/notebook/page[@name='information']" position="after">
+                    <page string="Datos Laborales">
+                        <group col="3">
+                            <field name="afiliacion_id" string="Afiliacion"/>
+                            <separator />
+                            <field name="tipo_seguro" string="Seguro"/>
+                            <separator />
+                            <field name="tipo_comision" />
+                            <separator />
+                            <field name="distribucion_analitica_id" />
+                            <separator />
+                            <field name="cuspp"/>
+                            <separator />
+                            <field name="situacion_id"/>
+                            <separator />
+                            <field name="otros_5ta_categoria"/>
+                        </group>
+                    </page>
+                    <page string="Suspencion Laboral">
+                        <group col="3">
+                            <field name="tipo_suspension_id"/>
+                            <separator />
+                            <field name="motivo" />
+                            <separator />
+                            <field name="nro_dias" />
+                        </group>
+                    </page>
+                    <page string="AFP NET">
+                        <group col="3">
+                            <field name="excepcion_aportador"/>
+                            <separator />
+                            <field name="regimen_laboral" />
+                            <separator />
+                        </group>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="hr_contract_view_tree_inherit" model="ir.ui.view">
+            <field name="name">hr_contract_view</field>
+            <field name="model">hr.contract</field>
+            <field name="inherit_id" ref="hr_contract.hr_contract_view_tree"/>
+            <field name="priority" eval="17" />
+            <field name="arch" type="xml">
+                <field name="employee_id" position="after">
+                    <field name="state"/>
+                </field>
+            </field>
+        </record>
+    </data>
+</odoo>

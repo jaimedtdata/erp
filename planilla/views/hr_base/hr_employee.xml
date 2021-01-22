@@ -1,0 +1,50 @@
+<odoo>
+    <record id="planilla_hr_employee_form_inherit_form" model="ir.ui.view">
+        <field name="name">planilla_hr_employee_form_inherit_form</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form" />
+        <field name="arch" type="xml">
+
+            <!-- <xpath expr="//form" position="attributes">
+                <attribute name="delete">0</attribute>
+            </xpath> -->
+            <field name="identification_id" position="before">
+                <field name="tablas_tipo_documento_id" required="1"/>
+            </field>
+            <field name="address_home_id" position="after">
+                <field name="condicion" />
+                <field name="tipo_empresa" />
+            </field>
+            <field name="name" position="replace">
+                <field name="name" invisible="1"/>
+            </field>
+            <field name="name" position="after">
+                <group >
+                    <field name="nombres" placeholder="Nombre" nolabel="1" required="1" colspan="2"/>
+                    <field name="a_paterno" placeholder="Apellido Paterno" nolabel="1" required="1" colspan="2"/>
+                    <field name="a_materno" placeholder="Apellido Materno" nolabel="1" required="1" colspan="2"/>
+                </group>
+            </field>
+            <label for="name" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </label>
+            <!-- 
+            <xpath expr="//form/sheet/notebook/page[@name='personal_information']/group/group[2]" position="after">
+                <group string="Tablas">
+                    <field name="tablas_tipo_documento_id" />
+                </group>
+            </xpath> -->
+        </field>
+    </record>
+
+    <!-- <record id="planilla_hr_employee_form_inherit_tree" model="ir.ui.view">
+        <field name="name">planilla_hr_employee_form_inherit_tree</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_tree" />
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="attributes">
+                <attribute name="delete">0</attribute>
+            </xpath>
+        </field>
+    </record> -->
+</odoo>
