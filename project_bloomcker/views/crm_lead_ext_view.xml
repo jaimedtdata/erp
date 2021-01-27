@@ -9,7 +9,13 @@
             <field name="arch" type="xml">
 
                 <xpath expr="//header" position="inside">
-                    <button name="create_project_ext" string="Crear Proyecto" type="object" />
+                    <!-- <button name="create_project_ext_bl" string="Crear Proyecto" type="object" /> -->
+                    <button name="create_project_ext_bl" string="Crear Proyecto" type="object" class="oe_highlight" attrs="{'invisible': [('show_button_project','=',False)]}"/>
+                </xpath>
+
+                <xpath expr="//field[@name='phone']" position="after">
+                    <field name="show_button_project" string="Show bton Project"/>
+                    <field name="project_bl" readonly="1"/>
                 </xpath>
 
             </field>
