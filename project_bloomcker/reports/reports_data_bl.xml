@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <report
+                string="Facturación 1"
+                id="action_report_project_invoice1_bl"
+                model="project.project"
+                name="project_bloomcker.project_bloomcker_invoice1_report"
+                file="project_bloomcker.project_bloomcker_invoice1_report"
+                report_type="qweb-pdf"
+
+        />
+
+    </data>
+</openerp>

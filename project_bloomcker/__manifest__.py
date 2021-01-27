@@ -10,8 +10,10 @@
     "data": [
         'security/ir.model.access.csv',
         'views/crm_lead_ext_view.xml',
-        # 'views/project_task_ext_view.xml',
+        'views/project_task_ext_view.xml',
         'views/project_project_ext_view.xml',
+        'reports/invoice1_bl.xml',
+        'reports/reports_data_bl.xml',
     ],
     "application": True,
 }
