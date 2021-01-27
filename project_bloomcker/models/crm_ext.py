@@ -22,7 +22,8 @@ class ProjectExt(models.Model):
                 'use_tasks':True,
                 'allow_timesheets':True,
                 'use_issues':True,
-                'analytic_account_id': account_analytic.id
+                # 'analytic_account_id': account_analytic.id,
+                'quotation_bl': self.planned_revenue
             }
             project = self.env['project.project'].create(registro)
             self.project_bl = project.id
