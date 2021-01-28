@@ -21,7 +21,7 @@ class res_currency_rate(models.Model):
 			date_tmp = str(self.name)[:7].replace("-","/")
 		vals['period_name'] = date_tmp
 		t = super(res_currency_rate,self).write(vals)
-		
+
 		return t
 
 	@api.model
@@ -33,7 +33,7 @@ class res_currency_rate(models.Model):
 			t.period_name = str(t.name)[:7].replace("-","/")
 		else:
 			t.period_name = "Indefinido"
-		
+
 		return t
 
 
@@ -91,7 +91,7 @@ class res_currency_wizard_optional(models.Model):
 		currency_extra = self.env['res.currency'].search([('name','=','USD')])[0]
 
 		tmp_fn = self.env['res.currency.rate'].search([('currency_id','=',currency_extra.id),('name','=',str(self.fecha_unica))])
-		
+
 		if len(tmp_fn)>0:
 			tmp_fn.type_purchase =  float(self.type_compra)
 			tmp_fn.type_sale = float(self.type_venta)
@@ -113,7 +113,7 @@ class res_currency_wizard_optional(models.Model):
 			new_rate= self.env['res.currency.rate'].create(data)
 			print new_rate
 			currency_extra.write({'rate_ids':[(4,new_rate.id)]})
-			
+
 	@api.multi
 	def do_auto(self):
 		try:
@@ -137,7 +137,7 @@ class res_currency_wizard_optional(models.Model):
 				mes_ini = datetime.datetime(year=mes_ini.year +int((mes_ini.month+1)/13),month = (mes_ini.month%12)+1,day=1)
 
 			rango_mes.append([str(mes_ini.month),str(mes_ini.year)])
-				
+
 			saldos = []
 			dato_sal = [0,0,0]
 			cont = 0
@@ -146,7 +146,7 @@ class res_currency_wizard_optional(models.Model):
 				mes = meses[0]
 				anho = meses[1]
 				datos = urllib.urlencode({'mes':mes, 'anho':anho})
-				url = "http://www.sunat.gob.pe/cl-at-ittipcam/tcS01Alias?"
+				url = "https://e-consulta.sunat.gob.pe/cl-at-ittipcam/tcS01Alias"
 				try:
 					res = urllib2.urlopen(url + datos)
 				except:
@@ -163,7 +163,7 @@ class res_currency_wizard_optional(models.Model):
 							while (diaanterior and diaanterior + datetime.timedelta(days=1) != dia_actual):
 								diaanterior = diaanterior + datetime.timedelta(days=1)
 								saldos.append( [diaanterior,diaanterior.day,saldos[-1][2],saldos[-1][3] ] )
-								
+
 							saldos.append([dia_actual,dato_sal[0],dato_sal[1],dato_sal[2]])
 							diaanterior = dia_actual
 						cont = (cont+1)%3
@@ -182,7 +182,7 @@ class res_currency_wizard_optional(models.Model):
 					dic_sal[fecha_inicial] = dic_sal[fecha_inicial - datetime.timedelta(days=1)]
 					final.append([fecha_inicial,dic_sal[fecha_inicial][0],dic_sal[fecha_inicial][1] ])
 				fecha_inicial = fecha_inicial + datetime.timedelta(days= 1)
-			
+
 
 			currency_extra = self.env['res.currency'].search([('name','=','USD')])[0]
 			for fn in final:
