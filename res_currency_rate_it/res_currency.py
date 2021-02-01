@@ -131,29 +131,39 @@ class res_currency_wizard_optional(models.Model):
 
 		try:
 			res = requests.get(url).content
-			df_list = pd.read_html(res)
+			df_list = pd.read_html(url, index_col=0)
 			df = df_list[-1]
+			print(df)
 		except:
 			raise UserError('No se puede conectar a la página de Sunat!')
 
 		currency_extra = self.env['res.currency'].search([('name','=','USD')])[0]
-		for i in range(1, len(df)):
-			date = fields.Datetime.from_string(str(datetime.datetime.strptime(str(df.iloc[i,0])[0:10], '%Y-%m-%d')))
-			print(date)
-			registro = self.env['res.currency.rate'].search([('currency_id','=',currency_extra.id),('name','=',date.date())], limit=1)
-			if len(registro) != 0:
-				registro.type_purchase = float(df.iloc[i,2])
-				registro.type_sale = float(df.iloc[i,3])
-				registro.tipo = "Automatico"
-			elif len(registro) == 0:
-				data = {
-					'name':date.date(),
-					'type_purchase':df.iloc[i,2],
-					'type_sale':df.iloc[i,3],
-					'period_name':str(date.date()),
-					'tipo':'Automatico',
-					'currency_id':currency_extra.id,
-					}
-				new_rate= self.env['res.currency.rate'].create(data)
+		j = 0
+		for i in df.index:
+			if str(i) != "FECHA":
+				format_datetime = str(i)[6:10]+"-"+str(i)[3:5]+"-"+str(i)[:2]+" 00:00:00"
+				date = fields.Datetime.from_string(format_datetime)
+				print(date)
+				registro = self.env['res.currency.rate'].search([('currency_id','=',currency_extra.id),('name','=',date.date())], limit=1)
+				print(registro)
+				if len(registro) != 0:
+					registro.type_purchase = float(df.iloc[j,1])
+					registro.type_sale = float(df.iloc[j,2])
+					registro.tipo = "Automatico"
+
+				elif len(registro) == 0:
+					data = {
+						'name':date.date(),
+						'type_purchase':df.iloc[j,1],
+						'type_sale':df.iloc[j,2],
+						'period_name':str(date.date()),
+						'tipo':'Automatico',
+						'currency_id':currency_extra.id,
+						}
+					registro= self.env['res.currency.rate'].create(data)
+
+				print(registro.name)
+
+			j += 1
 
 		return 0
