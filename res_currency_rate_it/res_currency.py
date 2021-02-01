@@ -133,7 +133,6 @@ class res_currency_wizard_optional(models.Model):
 			res = requests.get(url).content
 			df_list = pd.read_html(url, index_col=0)
 			df = df_list[-1]
-			print(df)
 		except:
 			raise UserError('No se puede conectar a la página de Sunat!')
 
@@ -143,9 +142,7 @@ class res_currency_wizard_optional(models.Model):
 			if str(i) != "FECHA":
 				format_datetime = str(i)[6:10]+"-"+str(i)[3:5]+"-"+str(i)[:2]+" 00:00:00"
 				date = fields.Datetime.from_string(format_datetime)
-				print(date)
 				registro = self.env['res.currency.rate'].search([('currency_id','=',currency_extra.id),('name','=',date.date())], limit=1)
-				print(registro)
 				if len(registro) != 0:
 					registro.type_purchase = float(df.iloc[j,1])
 					registro.type_sale = float(df.iloc[j,2])
@@ -161,8 +158,6 @@ class res_currency_wizard_optional(models.Model):
 						'currency_id':currency_extra.id,
 						}
 					registro= self.env['res.currency.rate'].create(data)
-
-				print(registro.name)
 
 			j += 1
 
