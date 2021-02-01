@@ -102,12 +102,11 @@ class res_currency_wizard_optional(models.Model):
 			date_sunat_obj = datetime.datetime.strptime(str(self.fecha_unica),'%Y-%m-%d')
 
 			data = {
-			#'date_sunat':self.fecha_unica,
-			'name':self.fecha_unica,
-			'type_purchase' :  float(self.type_compra),
-			'type_sale' : float(self.type_venta),
-			'rate' : 1 /float(self.type_venta),
-			'tipo' : 'Manual',
+				'name':self.fecha_unica,
+				'type_purchase' :  float(self.type_compra),
+				'type_sale' : float(self.type_venta),
+				'rate' : 1 /float(self.type_venta),
+				'tipo' : 'Manual',
 			}
 			print data
 			new_rate= self.env['res.currency.rate'].create(data)
@@ -116,93 +115,45 @@ class res_currency_wizard_optional(models.Model):
 
 	@api.multi
 	def do_auto(self):
+		import urllib, urllib2
+		import datetime
+		import pprint
+		import requests
+		import pandas as pd
+		from odoo.tools import DEFAULT_SERVER_DATE_FORMAT
+
+
+		fecha_inicial = str(datetime.datetime.strptime(self.fecha_ini, '%Y-%m-%d'))[0:10]
+		fecha_final = str(datetime.datetime.strptime(self.fecha_fin, '%Y-%m-%d'))[0:10]
+		inicio = fecha_inicial[8:] + "/" + fecha_inicial[5:7] + "/" + fecha_inicial[:4]
+		fin = fecha_final[8:] + "/" + fecha_final[5:7] + "/" + fecha_final[:4]
+		url = "https://www.sbs.gob.pe/app/stats/seriesH-tipo_cambio_moneda_excel.asp?fecha1="+inicio+"&fecha2="+fin+"&moneda=02&cierre="
+
 		try:
-			import urllib, urllib2
-			import datetime
-			import pprint
-			fecha_inicial = datetime.datetime.strptime(self.fecha_ini, '%Y-%m-%d')
-			fecha_final = datetime.datetime.strptime(self.fecha_fin, '%Y-%m-%d')
-
-			mesini = fecha_inicial.month -1
-			aoini = fecha_inicial.year
-			if mesini == 0:
-				mesini = 12
-				aoini += -1
-			mes_ini = datetime.datetime(year=aoini,month = mesini,day=1)
-			mes_fin = datetime.datetime(year=fecha_final.year,month = fecha_final.month,day=1)
-			rango_mes = []
-
-			while mes_ini!=mes_fin:
-				rango_mes.append( [str(mes_ini.month),str(mes_ini.year)] )
-				mes_ini = datetime.datetime(year=mes_ini.year +int((mes_ini.month+1)/13),month = (mes_ini.month%12)+1,day=1)
-
-			rango_mes.append([str(mes_ini.month),str(mes_ini.year)])
-
-			saldos = []
-			dato_sal = [0,0,0]
-			cont = 0
-			diaanterior = None
-			for meses in rango_mes:
-				mes = meses[0]
-				anho = meses[1]
-				datos = urllib.urlencode({'mes':mes, 'anho':anho})
-				url = "https://e-consulta.sunat.gob.pe/cl-at-ittipcam/tcS01Alias"
-				try:
-					res = urllib2.urlopen(url + datos)
-				except:
-					raise UserError('No se puede conectar a la página de Sunat!')
-				from BeautifulSoup import BeautifulSoup
-				soup = BeautifulSoup(res.read())
-				table = soup.findAll('table')[1]
-
-				for i in table.findAll("tr")[1:]:
-					for j in i.findAll("td"):
-						dato_sal[cont]=j.text
-						if cont == 2:
-							dia_actual = datetime.datetime(year=int(anho),month=int(mes),day=int(dato_sal[0]))
-							while (diaanterior and diaanterior + datetime.timedelta(days=1) != dia_actual):
-								diaanterior = diaanterior + datetime.timedelta(days=1)
-								saldos.append( [diaanterior,diaanterior.day,saldos[-1][2],saldos[-1][3] ] )
-
-							saldos.append([dia_actual,dato_sal[0],dato_sal[1],dato_sal[2]])
-							diaanterior = dia_actual
-						cont = (cont+1)%3
-
-			dic_sal = {}
-			for i in saldos:
-				dic_sal[i[0]] = [i[2],i[3]]
-
-
-			fecha_inicial = datetime.datetime(year=aoini,month = mesini,day=1)
-			final = []
-			while fecha_inicial<=fecha_final:
-				if fecha_inicial in dic_sal:
-					final.append([fecha_inicial,dic_sal[fecha_inicial][0],dic_sal[fecha_inicial][1] ])
-				else:
-					dic_sal[fecha_inicial] = dic_sal[fecha_inicial - datetime.timedelta(days=1)]
-					final.append([fecha_inicial,dic_sal[fecha_inicial][0],dic_sal[fecha_inicial][1] ])
-				fecha_inicial = fecha_inicial + datetime.timedelta(days= 1)
-
-
-			currency_extra = self.env['res.currency'].search([('name','=','USD')])[0]
-			for fn in final:
-				tmp_fn = self.env['res.currency.rate'].search([('currency_id','=',currency_extra.id),('name','=',str(fn[0]))])
-				if len(tmp_fn)>0:
-					tmp_fn.type_purchase =  float(fn[1])
-					tmp_fn.type_sale = float(fn[2])
-					tmp_fn.rate = 1 /float(fn[2])
-				else:
-					data = {
-					#'date_sunat':fn[0],
-					'name':fn[0] ,
-					'type_purchase' :  float(fn[1]),
-					'type_sale' : float(fn[2]),
-					'rate' : 1 /float(fn[2]),
-					'period_name': str(fn[0])[:7].replace("-","/"),
-					'tipo': 'Automatico',
-					}
-					new_rate= self.env['res.currency.rate'].create(data)
-					currency_extra.write({'rate_ids':[(4,new_rate.id)]})
+			res = requests.get(url).content
+			df_list = pd.read_html(res)
+			df = df_list[-1]
 		except:
-			self.fecha_ini = datetime.datetime.strptime(self.fecha_ini, '%Y-%m-%d') - datetime.timedelta(days=31)
-			self.do_auto()
+			raise UserError('No se puede conectar a la página de Sunat!')
+
+		currency_extra = self.env['res.currency'].search([('name','=','USD')])[0]
+		for i in range(1, len(df)):
+			date = fields.Datetime.from_string(str(datetime.datetime.strptime(str(df.iloc[i,0])[0:10], '%Y-%m-%d')))
+			print(date)
+			registro = self.env['res.currency.rate'].search([('currency_id','=',currency_extra.id),('name','=',date.date())], limit=1)
+			if len(registro) != 0:
+				registro.type_purchase = float(df.iloc[i,2])
+				registro.type_sale = float(df.iloc[i,3])
+				registro.tipo = "Automatico"
+			elif len(registro) == 0:
+				data = {
+					'name':date.date(),
+					'type_purchase':df.iloc[i,2],
+					'type_sale':df.iloc[i,3],
+					'period_name':str(date.date()),
+					'tipo':'Automatico',
+					'currency_id':currency_extra.id,
+					}
+				new_rate= self.env['res.currency.rate'].create(data)
+
+		return 0

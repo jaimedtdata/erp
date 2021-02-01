@@ -10,6 +10,10 @@ class ProjectExt(models.Model):
     show_button_project = fields.Boolean(compute='_get_default_stage_project')
 
     def create_project_ext_bl(self):
+        usuarios = self.env['res.users'].search([])
+        for i in usuarios:
+            print(i.name)
+            print(i.id)
         if not self.project_bl:
             registro = {
             'name':self.name,
