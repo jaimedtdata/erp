@@ -90,3 +90,5 @@ access_bl_model_account_sale_register,account.sale.register,account_registro_ven
 access_bl_model_account_forth_category,account.forth.category,account_honorarios_it.model_account_forth_category,base.group_public,1,1,1,1
 access_bl_model_account_account_analytic_rep,account.account.analytic.rep,account_analisis_destino_it.model_account_account_analytic_rep,base.group_public,1,1,1,1
 access_bl_model_account_account_analytic_rep_t,account.account.analytic.rep.t,account_analisis_destino_it.model_account_account_analytic_rep_t,base.group_public,1,1,1,1
+access_bl_model_small_cash_another,small.cash.another,small_cash_another_it.model_small_cash_another,base.group_public,1,1,1,1
+access_bl_model_small_cash_view,small.cash.view,small_cash_another_it.model_small_cash_view,base.group_public,1,1,1,1
