@@ -8,8 +8,14 @@
             <field name="inherit_id" ref="project.view_task_form2"/>
             <field name="arch" type="xml">
 
-                <xpath expr="//field[@name='project_id']" position="after">
+                <!-- <xpath expr="//field[@name='project_id']" position="after">
                     <field name="milestone_commercial" string="Hito Comercial"/>
+                </xpath> -->
+
+                <xpath expr="//field[@name='user_id']" position="replace">
+                    <field name="milestone_commercial" string="Hito Comercial"/>
+                    <!-- domain="[('self.project_id.means_ext', 'in', user_id)]" -->
+                    <field  name="user_id" class="o_task_user_field" options="{&quot;no_open&quot;: True}" />
                 </xpath>
 
             </field>
