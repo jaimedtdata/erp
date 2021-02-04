@@ -9,13 +9,14 @@
                 <field name="active" position="after">
                     <field name="cod_sunat"/>
                 </field>
-
                 <field name="analytic_account_id" position="attributes">
                     <attribute name="invisible">1</attribute>
                 </field>
-
+                <field name="category_id" position="attributes">
+                    <attribute name="required">1</attribute>
+                </field>
                 <field name="appears_on_payslip" position="after">
-                    <field name="is_subtotal" />
+                    <field name="is_subtotal" required="1"/>
                 </field>
                 <xpath expr="//form/notebook/page[1]/group/separator" position="attributes">
                     <attribute name="invisible">1</attribute>
@@ -29,6 +30,9 @@
                 <xpath expr="//form/notebook/page[1]/group/field[@name='register_id']" position="attributes">
                     <attribute name="invisible">1</attribute>
                 </xpath>
+                <page name="rules" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </page>
 
                 <!-- <xpath expr="//form/notebook/page[3]" position="attributes">
                      <attribute name="invisible">1</attribute>

@@ -8,8 +8,7 @@ from odoo.exceptions import ValidationError
 
 
 class HrPayslipWorkedDays(models.Model):
-
-
     _inherit='hr.payslip.worked_days'
+
     tasa = fields.Float(string='Tasa')
     minutos = fields.Float(string='Minutos')

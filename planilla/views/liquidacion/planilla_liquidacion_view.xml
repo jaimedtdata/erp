@@ -8,6 +8,7 @@
                     <button string="Calcular" type="object" name="calcular_liquidacion" class="oe_highlight"/>
                     <button string="Exportar Excel" type="object" name="get_excel"/>
                     <button string="Exportar PDF" type="object" name="get_liquidacion_wizard"/>
+                    <button string="Certificado PDF" type="object" name="get_certificado_wizard"/>
                     <!--<button string="Generar Boleta" type="object" name="get_pdf" invisible="1"/>
                     <button string="Agregar/Reemplazar Empleado" type="object" name="open_wizard"/>
                     <button string="Adelantos" type="object" name="get_adelantos"/>
@@ -17,6 +18,7 @@
                     <group>
                         <field name="year"/>
                         <field name="plus_9"/>
+                        <field name="calcular_meses_dias"/>
                     </group>
                     <group>
                         <field name="month"/>
@@ -38,6 +40,9 @@
                     <page string="Vacaciones">
                         <field name="planilla_vacaciones_lines"/>
                     </page>
+                    <page string="indemnizacion">
+                        <field name="planilla_indemnizacion_lines"/>
+                    </page>
                 </notebook>
             </form>
         </field>
@@ -51,6 +56,8 @@
                 <field name="month" required="1" string="Mes"/>
                 <!-- <field name="tipo" string="Tipo de Liquidacion"/> -->
                 <field name="plus_9"/>
+                <field name="calcular_meses_dias" />
+
             </tree>
         </field>
     </record>

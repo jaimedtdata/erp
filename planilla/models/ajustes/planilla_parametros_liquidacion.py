@@ -15,7 +15,8 @@ class PlanillaParametrosLiquidacion(models.Model):
     cod_cts_trunca = fields.Many2one("planilla.inputs.nomina",help="Codigo para CTS Trunca")
     cod_gratificacion= fields.Many2one("planilla.inputs.nomina",help="Codigo para Grafificacion")
     cod_gratificacion_trunca = fields.Many2one("planilla.inputs.nomina",help="Codigo para Grafificacion Trunca")
-    cod_bonificacion_9 = fields.Many2one("planilla.inputs.nomina",help="Codigo para Bonificacion 9%")
+    cod_bonificacion_9 = fields.Many2one("planilla.inputs.nomina",help="Codigo para Bonificacion 9% Trunca")
+    cod_indemnizacion = fields.Many2one("planilla.inputs.nomina",help="Codigo para Indemnizacion")
 
 
     @api.model
@@ -51,5 +52,8 @@ class PlanillaParametrosLiquidacion(models.Model):
         elif not parametros_liquidacion.cod_bonificacion_9.codigo:
             raise UserError(
                 'Debe configurar parametros de gratificacion cod_bonificacion_9 Nomina->configuracion->parametros liquidacion')
+        elif not parametros_liquidacion.cod_indemnizacion.codigo:
+            raise UserError(
+                'Debe configurar parametros de gratificacion cod_indemnizacion Nomina->configuracion->parametros liquidacion')
         else:
             return parametros_liquidacion

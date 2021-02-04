@@ -7,9 +7,9 @@
             <form>
                 <group string="Parametros de CTS">
                     <group>
-                        <field name="cod_cts" />
-                        <field name="cod_bonificaciones" />
-                        <field name="cod_comisiones" />
+                        <field name="cod_cts"/>
+                        <field name="cod_bonificaciones" widget="many2many_tags"/>
+                        <field name="cod_comisiones" widget="many2many_tags"/>
                         <field name="cod_sobretiempos" />
                     </group>
                     <group>

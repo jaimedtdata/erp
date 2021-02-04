@@ -8,7 +8,7 @@
                 <group>
                     <field name="total_debe" readonly="1" />
                     <field name="total_haber" readonly="1"/>
-                    <field name="diferencia"/>
+                    <field name="diferencia" readonly="1"/>
                     <field name="diario"/>
                     <field name="cuenta_ajuste"/>
                 </group>

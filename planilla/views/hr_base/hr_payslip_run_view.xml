@@ -22,15 +22,25 @@
 
             <xpath expr="//form/header/button[@name='%(hr_payroll.action_hr_payslip_by_employees)d']" position="after">
                 <button name="calcular_reglas_salariales" string="Calcular Reglas Salariales" type="object" class="oe_highlight fa fa-desktop" states="draft"/>
-                <button name="importar_beneficios_sociales" string="Importar beneficios sociales" type="object" class="oe_highlight fa fa-desktop" states="draft"/>
+                <field name="flag" invisible="1"/>
+                <button name="importar_quinta_categoria" string="Importar quinta categoria" type="object" class="oe_highlight fa fa-desktop" attrs="{'invisible':[('flag', '!=', True)]}"/>
+                <field name="cts_flag" invisible="1"/>
+                <field name="grati_flag" invisible="1"/>
+                <field name="liqui_flag" invisible="1"/>
+                <button name="importar_beneficios_sociales" string="Importar beneficios sociales" type="object" class="oe_highlight fa fa-desktop" attrs="{'invisible':[('cts_flag','!=',True),('grati_flag','!=',True),('liqui_flag','!=',True)]}"/>
                 <button name="generar_planilla_tabular" string="Planilla en pantalla" type="object" class="fa fa-file-text-o" states="draft"/>
                 <!-- <button name="ver_pantalla_planilla_tabular" string="Ver en pantalla" type="object" class="fa fa-file-text-o" states="draft"/> -->
                 <button name="exportar_planilla_tabular_xlsx" string="Exportar excel" type="object" class="fa fa-file-text-o" states="draft"/>
                 <button name="exportar_plame" string="Exportar Plame" type="object" class="fa fa-file-text-o" states="draft"/>
                 <button name="exportar_plame_horas" string="Exportar Plame Horas" type="object" class="fa fa-file-text-o" states="draft"/>
+                <button name="exportar_plame_subsidios" string="Exportar Plame Subsidios" type="object" class="fa fa-file-text-o" states="draft"/>
+                <button name="exportar_plame_tasas" string="Exportar Plame Tasas" type="object" class="fa fa-file-text-o" states="draft"/>
+                <button name="recalcular_inputs" string="Generar Inputs" type="object" class="fa fa-file-text-o" states="draft"/>
+                <button name="import_advances" string="Importar Adelantos" type="object" class="oe_highlight fa fa-desktop"/>
+                <button name="import_loans" string="Importar Prestamos" type="object" class="oe_highlight fa fa-desktop"/>
             </xpath>
             <xpath expr="//form/header/button[@name='%(hr_payroll.action_hr_payslip_by_employees)d']" position="after">
-                <button name="generar_planillas_lotes" string="Generar planillas" confirm="Esta seguro que quiere generar nominas? (esto eliminara las nominas existentes de si los hubiera)" type="object" class="oe_highlight fa fa-chevron-circle-right" states="draft"/>
+                <button name="generar_planillas_lotes" string="Generar planillas" confirm="Esta seguro que quiere generar nominas? (esto eliminara las nominas existentes de si los hubiera)" type="object" class="oe_highlight fa fa-chevron-circle-right" states="draft" attrs="{'invisible': [('bool_field', '=', True)]}"/>
                 <button name="regulariza_dias_laborados" string="Dias Laborados" type="object" class="oe_highlight fa fa-chevron-circle-right" states="draft"/>
             </xpath>
             <xpath expr="//form/header/button[@name='%(hr_payroll.action_hr_payslip_by_employees)d']" position="attributes">
@@ -40,7 +50,7 @@
             <field name="credit_note" position="after">
                 <field name="dias_calendarios"/>
                 <field name="feriados"/>
-
+                <field name="bool_field" invisible="1"/>
                 <field name="asiento_contable_id" readonly="1"/>
 
 
@@ -168,6 +178,33 @@
         <field eval="'ir.actions.server,%d'%planilla_exportar_nomina_plame_horas" name="value"/>
     </record>
 
+    <record id="planilla_exportar_nomina_plame_subsidios" model="ir.actions.server">
+        <field name="name">Exportar Plame Subsidios</field>
+        <field name="model_id" ref="model_hr_payslip_run"/>
+        <field name="state">code</field>
+        <field name="code"> action= env['hr.payslip.run'].browse(context['active_ids']).exportar_plame_subsidios()</field>
+    </record>
+
+    <record id="more_button_exportar_nomina_plame_sudsidios" model="ir.values">
+        <field eval="'client_action_multi'" name="key2"/>
+        <field eval="'hr.payslip.run'" name="model"/>
+        <field name="name">Exportar Plame Subsidios</field>
+        <field eval="'ir.actions.server,%d'%planilla_exportar_nomina_plame_subsidios" name="value"/>
+    </record>
+
+    <record id="planilla_exportar_nomina_plame_tasas" model="ir.actions.server">
+        <field name="name">Exportar Plame SCTR</field>
+        <field name="model_id" ref="model_hr_payslip_run"/>
+        <field name="state">code</field>
+        <field name="code"> action= env['hr.payslip.run'].browse(context['active_ids']).exportar_plame_tasas()</field>
+    </record>
+
+    <record id="more_button_exportar_nomina_plame_tasas" model="ir.values">
+        <field eval="'client_action_multi'" name="key2"/>
+        <field eval="'hr.payslip.run'" name="model"/>
+        <field name="name">Exportar Plame SCTR</field>
+        <field eval="'ir.actions.server,%d'%planilla_exportar_nomina_plame_tasas" name="value"/>
+    </record>
 
     <!-- generar asiento contable -->
     <record id="planilla_generar_asiento_contable" model="ir.actions.server">
@@ -183,4 +220,6 @@
         <field name="name">Generar Asiento Contable</field>
         <field eval="'ir.actions.server,%d'%planilla_generar_asiento_contable" name="value" />
     </record>
+    
+    
 </odoo>

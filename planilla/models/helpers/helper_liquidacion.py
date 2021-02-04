@@ -40,9 +40,6 @@ class HelperLiquidacion(models.Model):
 
             column_len.append(max_col+5)
         return column_len
-        # idx_max = max([len(str(s)) for s in dataframe.index.values] + [len(str(dataframe.index.name))])
-        # # Then, we concatenate this to the max of the lengths of column name and its values for each column, left to right
-        # return [idx_max] + [max([len(str(s)) for s in dataframe[col].values] + [len(col)]) for col in dataframe.columns]
 
 
 
@@ -50,170 +47,150 @@ class HelperLiquidacion(models.Model):
     @api.model
     def getAsignacionFamiliarByDate(self, fecha_ini, fecha_fin, employee_id, code):
         query = """
-        select total from hr_payslip hp
-        inner join hr_payslip_line hpl
-        on hpl.slip_id = hp.id
+        select sum(hpl.total) as total
+        from hr_payslip hp
+        inner join hr_payslip_line hpl on hpl.slip_id = hp.id
+        inner join hr_contract hc on hc.id = hp.contract_id 
         where hp.date_from >= '%s' and hp.date_to<= '%s' and hp.employee_id =%d
-        and code ='%s'
+        and code ='%s' and hc.regimen_laboral_empresa not in ('practicante','microempresa')
+        group by hp.employee_id
         """ % (fecha_ini, fecha_fin, employee_id, code)
 
         self.env.cr.execute(query)
         res = self.env.cr.dictfetchone()
-        return res['total'] if len(res) > 0 else 0.0
+        return res['total'] if res else 0.0
 
     @api.model
-    def getBasicoByDate(self, fecha_ini, fecha_fin, employee_id, code):
-
-        query = """
-        select total from hr_payslip hp
-        inner join hr_payslip_line hpl
-        on hpl.slip_id = hp.id
-        where hp.date_from >= '%s' and hp.date_to<= '%s' and hp.employee_id =%d
-        and code ='%s'
-        """ % (fecha_ini, fecha_fin, employee_id, code)
-
-        self.env.cr.execute(query)
-        res = self.env.cr.dictfetchone()
-        return res['total'] if len(res) > 0 else 0.0
+    def getBasicoByDate(self, fecha_ini, fecha_fin, employee_id, code,liquidacion=False):
+        contracts = self.env['hr.employee'].browse(employee_id).contract_ids
+        filtered_contracts = filter(lambda c:c.regimen_laboral_empresa not in ('practicante','microempresa')  
+            and datetime.strptime(c.date_start,'%Y-%m-%d').date() <= fecha_fin
+            and c.situacion_id.codigo == '1' if not liquidacion else True,contracts)
+        last_contract = max(filtered_contracts,key=lambda c:c['date_start']) if filtered_contracts else False
+        return last_contract.wage if last_contract else 0.0
 
     @api.model
     def getSumFaltas(self, fecha_ini, fecha_fin, employee_id, code):
 
+        # query = """
+        # select sum(total) as total from hr_payslip hp
+        # inner join hr_payslip_line hpl
+        # on hpl.slip_id = hp.id
+        # where hp.date_from >= '%s' and hp.date_to<= '%s' and hp.employee_id =%d
+        # and code ='%s'
+        # group by hp.employee_id
+        # """ % (fecha_ini, fecha_fin, employee_id, code)
         query = """
-        select sum(total) as total from hr_payslip hp
-        inner join hr_payslip_line hpl
-        on hpl.slip_id = hp.id
+        select sum(number_of_days) as total 
+        from hr_payslip hp
+        inner join hr_contract hc on hc.id = hp.contract_id
+        inner join hr_payslip_worked_days hpwd on hpwd.payslip_id = hp.id
         where hp.date_from >= '%s' and hp.date_to<= '%s' and hp.employee_id =%d
-        and code ='%s'
+        and hpwd.code ='%s' and hc.regimen_laboral_empresa not in ('practicante','microempresa')
         group by hp.employee_id
         """ % (fecha_ini, fecha_fin, employee_id, code)
 
         self.env.cr.execute(query)
         res = self.env.cr.dictfetchone()
-        return res['total'] if len(res) > 0 else 0.0
-
+        return res['total'] if res is not None else 0.0
 
     @api.model
     def queryBeneficiosSociales(self, fecha_ini, fecha_fin, employee_id, code):
+        # query = """
+        # select sum(total) as total,count(total) as count from hr_payslip hp
+        # inner join hr_payslip_line hpl
+        # on hpl.slip_id = hp.id
+        # where hp.date_from >= '%s' and hp.date_to<= '%s' and hp.employee_id =%d
+        # and code ='%s'
+        # group by hp.employee_id
+        # """ % (fecha_ini, fecha_fin, employee_id, code)
         query = """
-        select sum(total) as total,count(total) as count from hr_payslip hp
-        inner join hr_payslip_line hpl
-        on hpl.slip_id = hp.id
-        where hp.date_from >= '%s' and hp.date_to<= '%s' and hp.employee_id =%d
-        and code ='%s'
-        group by hp.employee_id
-        """ % (fecha_ini, fecha_fin, employee_id, code)
-        print "query beneficios sociales"
-        print query
+        select sum(coalesce(amount,0)) as total,count(amount) as count 
+        from hr_payslip hp
+        inner join hr_contract hc on hc.id = hp.contract_id
+        inner join hr_payslip_input hpi on hpi.payslip_id = hp.id
+        where hp.date_from >= '%s' and hp.date_to<= '%s' and hp.employee_id =%d and amount>0.0
+        and code in (%s) and hc.regimen_laboral_empresa not in ('practicante','microempresa')
+        """ % (fecha_ini, fecha_fin, employee_id,
+               ','.join("'"+i+"'" for i in code.mapped('code')))
+
         self.env.cr.execute(query)
         res = self.env.cr.dictfetchone()
-        return res['total'],res['count'] if len(res) > 0 else 0.0
+        return res['total'] if  res is not None  else 0.0,res['count'] if  res is not None  else 0.0
+    @api.model
+    def queryHorasExtras(self, fecha_ini, fecha_fin, employee_id, code):
+        query = """
+        select sum(hpl.total) as total,count(hpl.total) as count 
+        from hr_payslip hp
+        inner join hr_contract hc on hc.id = hp.contract_id
+        inner join hr_payslip_line hpl on hpl.slip_id = hp.id
+        where hp.date_from >= '%s' and hp.date_to<= '%s' and hp.employee_id =%d and hpl.total>0.0
+        and code ='%s' and hc.regimen_laboral_empresa not in ('practicante','microempresa')
+        group by hp.employee_id
+        """ % (fecha_ini, fecha_fin, employee_id, code)
+
+        self.env.cr.execute(query)
+        res = self.env.cr.dictfetchone()
+        return res['total'] if  res is not None  else 0.0,res['count'] if  res is not None  else 0.0
 
     @api.model
     def calcula_comision_gratificacion_hrs_extras(self, contrato, fecha_computable, fecha_fin_nominas, meses, fecha_cese):
-        print "CALCULANDO COMISIONES EN FECHAS ", fecha_computable, fecha_fin_nominas, meses
         parametros_gratificacion = self.env['planilla.gratificacion'].get_parametros_gratificacion()    
         fecha_inicio_nominas = date(
             fecha_computable.year, fecha_computable.month, 1)
 
-        # query_nro_comisiones_periodo = """
-        # select count(comisiones) count_comisiones,sum(comisiones) sum_comisiones
-        # from  hr_payslip hp
-        # where ( date_from>='%s' and date_to<='%s'  ) and
-        # comisiones>0 and
-        # hp.employee_id = %d
-        # """ % (fecha_inicio_nominas, fecha_fin_nominas, contrato.employee_id)
-        # print "query comisiones periodo ", query_nro_comisiones_periodo
-
-        # self.env.cr.execute(query_nro_comisiones_periodo)
-
-        # nro_comisiones_periodo = self.env.cr.dictfetchone()
-        # count_comisiones = int(
-        #     nro_comisiones_periodo['count_comisiones']) if nro_comisiones_periodo['count_comisiones'] else 0.0
-        # sum_comisiones = float(
-        #     nro_comisiones_periodo['sum_comisiones']) if nro_comisiones_periodo['sum_comisiones'] else 0.0
-
-        sum_comisiones,count_comisiones = self.queryBeneficiosSociales(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id,parametros_gratificacion.cod_comisiones.code)
-
+        sum_comisiones,count_comisiones = self.queryBeneficiosSociales(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id,parametros_gratificacion.cod_comisiones)
 
         # si tiene mas de 3 comisiones recibidas en el rango entonces tiene grati de comision
         if count_comisiones >= 3:
             if meses == 6:
-                print "sum comisiones ", sum_comisiones
                 comisiones_periodo = round(sum_comisiones/6.0, 2)
             else:
-                print "restare ", fecha_computable, ' - ', fecha_cese
-                dias = abs(fecha_computable - fecha_cese)
-                dias = dias.days+1
-                comisiones_periodo = round(sum_comisiones/dias, 2)*30
-                print "dias  calculo comisiones ", dias
-                print "suma  calculo comisiones ", sum_comisiones
+                payslips = self.env['hr.payslip'].search([ ('employee_id','=',contrato.employee_id.id),
+                                                ('date_to','>=',fecha_computable),
+                                                ('date_to','<=',fecha_fin_nominas)])
+                comisiones_periodo = round(sum_comisiones/float(len(payslips)), 2) if payslips else 0
+            #    dias = abs(fecha_computable - fecha_cese)
+            #    dias = dias.days+1
+            #    comisiones_periodo = round(sum_comisiones/dias, 2)*30
         else:
             comisiones_periodo = 0
 
-        # query_nro_bonificaciones = """
-        # select count(bonificaciones) count_bonificaciones,sum(bonificaciones) sum_bonificaciones
-        # from  hr_payslip hp
-        # where ( date_from>='%s' and date_to<='%s'  ) and
-        # bonificaciones>0 and
-        # hp.employee_id = %d
-        # """ % (fecha_inicio_nominas, fecha_fin_nominas, contrato.employee_id)
-
-        # print "promedio de bonificaciones ", query_nro_bonificaciones
-
-        # self.env.cr.execute(query_nro_bonificaciones)
-
-        # nro_bonificaciones_periodo = self.env.cr.dictfetchone()
-        # count_bonificaciones = int(
-        #     nro_bonificaciones_periodo['count_bonificaciones']) if nro_bonificaciones_periodo['count_bonificaciones'] else 0.0
-        # sum_bonificaciones = float(
-        #     nro_bonificaciones_periodo['sum_bonificaciones']) if nro_bonificaciones_periodo['sum_bonificaciones'] else 0.0
-
-        sum_bonificaciones,count_bonificaciones = self.queryBeneficiosSociales(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id,parametros_gratificacion.cod_bonificaciones.code)
-
+        sum_bonificaciones,count_bonificaciones = self.queryBeneficiosSociales(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id,parametros_gratificacion.cod_bonificaciones)
 
         # si tiene mas de 3 bonificaciones recibidas en el rango entonces tiene grati de comision
         if count_bonificaciones >= 3:
             if meses == 6:
                 promedio_bonificaciones = round(sum_bonificaciones/6.0, 2)
             else:
-                # dias = abs(fecha_fin_nominas.day-fecha_computable.day) + 1
-                dias = abs(fecha_computable - fecha_cese)
-                dias = dias.days+1
-                promedio_bonificaciones = round(
-                    sum_bonificaciones/dias, 2)*30
+                payslips = self.env['hr.payslip'].search([ ('employee_id','=',contrato.employee_id.id),
+                                                ('date_to','>=',fecha_computable),
+                                                ('date_to','<=',fecha_fin_nominas)])
+                promedio_bonificaciones = round(sum_bonificaciones/float(len(payslips)), 2) if payslips else 0
+            #    # dias = abs(fecha_fin_nominas.day-fecha_computable.day) + 1
+            #    dias = abs(fecha_computable - fecha_cese)
+            #    dias = dias.days+1
+            #    promedio_bonificaciones = round(
+            #        sum_bonificaciones/dias, 2)*30
         else:
             promedio_bonificaciones = 0.0
 
-        # query_nro_horas_sobretiempo = """
-        # select count(sobretiempos) count_sobretiempos,sum(sobretiempos) sum_sobretiempos
-        # from  hr_payslip hp
-        # where ( date_from>='%s' and date_to<='%s'  ) and
-        # sobretiempos>0 and
-        # hp.employee_id = %d
-        # """ % (fecha_inicio_nominas, fecha_fin_nominas, contrato.employee_id)
-
-        # self.env.cr.execute(query_nro_horas_sobretiempo)
-
-        # nro_horas_sobretiempo_periodo = self.env.cr.dictfetchone()
-        # count_sobretiempos = int(
-        #     nro_horas_sobretiempo_periodo['count_sobretiempos']) if nro_horas_sobretiempo_periodo['count_sobretiempos'] else 0.0
-        # sum_sobretiempos = float(
-        #     nro_horas_sobretiempo_periodo['sum_sobretiempos']) if nro_horas_sobretiempo_periodo['sum_sobretiempos'] else 0.0
-
-        sum_sobretiempos,count_sobretiempos = self.queryBeneficiosSociales(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id,parametros_gratificacion.cod_sobretiempos.code)
+        sum_sobretiempos,count_sobretiempos = self.queryHorasExtras(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id,parametros_gratificacion.cod_sobretiempos.code)
 
 
         # si tiene mas de 3 pagos de sobretiempo recibidas en el rango entonces tiene grati de comision
         if count_sobretiempos >= 3:
             if meses == 6:
-                promedio_horas_trabajo_extra = round(
-                    sum_sobretiempos/6.0, 2)
+                promedio_horas_trabajo_extra = round(sum_sobretiempos/6.0, 2)
             else:
-                dias = abs(fecha_computable - fecha_cese)
-                dias = dias.days+1
-                promedio_horas_trabajo_extra = round(
-                    sum_sobretiempos/dias, 2)*30
+                payslips = self.env['hr.payslip'].search([ ('employee_id','=',contrato.employee_id.id),
+                                                ('date_to','>=',fecha_computable),
+                                                ('date_to','<=',fecha_fin_nominas)])
+                promedio_horas_trabajo_extra = round(sum_sobretiempos/float(len(payslips)), 2) if payslips else 0
+            #    dias = abs(fecha_computable - fecha_cese)
+            #    dias = dias.days+1
+            #    promedio_horas_trabajo_extra = round(
+            #        sum_sobretiempos/dias, 2)*30
         else:
             promedio_horas_trabajo_extra = 0.0
         return comisiones_periodo, promedio_bonificaciones, promedio_horas_trabajo_extra
@@ -292,3 +269,130 @@ class HelperLiquidacion(models.Model):
             end_day + (end_month * 30) + (end_year * 360) -
             start_day - (start_month * 30) - (start_year * 360)
         )
+
+    def number_to_letter(self,number):
+        UNIDADES = (
+            '',
+            'UN ',
+            'DOS ',
+            'TRES ',
+            'CUATRO ',
+            'CINCO ',
+            'SEIS ',
+            'SIETE ',
+            'OCHO ',
+            'NUEVE ',
+            'DIEZ ',
+            'ONCE ',
+            'DOCE ',
+            'TRECE ',
+            'CATORCE ',
+            'QUINCE ',
+            'DIECISEIS ',
+            'DIECISIETE ',
+            'DIECIOCHO ',
+            'DIECINUEVE ',
+            'VEINTE '
+        )
+
+        DECENAS = (
+            'VENTI',
+            'TREINTA ',
+            'CUARENTA ',
+            'CINCUENTA ',
+            'SESENTA ',
+            'SETENTA ',
+            'OCHENTA ',
+            'NOVENTA ',
+            'CIEN '
+        )
+
+        CENTENAS = (
+            'CIENTO ',
+            'DOSCIENTOS ',
+            'TRESCIENTOS ',
+            'CUATROCIENTOS ',
+            'QUINIENTOS ',
+            'SEISCIENTOS ',
+            'SETECIENTOS ',
+            'OCHOCIENTOS ',
+            'NOVECIENTOS '
+        )
+
+        MONEDAS = (
+            {'country': u'Colombia', 'currency': 'COP', 'singular': u'PESO COLOMBIANO', 'plural': u'PESOS COLOMBIANOS', 'symbol': u'$'},
+            {'country': u'Estados Unidos', 'currency': 'USD', 'singular': u'DÓLAR', 'plural': u'DÓLARES', 'symbol': u'US$'},
+            {'country': u'Europa', 'currency': 'EUR', 'singular': u'EURO', 'plural': u'EUROS', 'symbol': u'€'},
+            {'country': u'México', 'currency': 'MXN', 'singular': u'PESO MEXICANO', 'plural': u'PESOS MEXICANOS', 'symbol': u'$'},
+            {'country': u'Perú', 'currency': 'PEN', 'singular': u'SOL', 'plural': u'SOLES', 'symbol': u'S/.'},
+            {'country': u'Reino Unido', 'currency': 'GBP', 'singular': u'LIBRA', 'plural': u'LIBRAS', 'symbol': u'£'}
+        )
+        # Para definir la moneda me estoy basando en los código que establece el ISO 4217
+        # Decidí poner las variables en inglés, porque es más sencillo de ubicarlas sin importar el país
+        # Si, ya sé que Europa no es un país, pero no se me ocurrió un nombre mejor para la clave.
+
+        def __convert_group(n):
+            """Turn each group of numbers into letters"""
+            output = ''
+
+            if(n == '100'):
+                output = "CIEN"
+            elif(n[0] != '0'):
+                output = CENTENAS[int(n[0]) - 1]
+
+            k = int(n[1:])
+            if(k <= 20):
+                output += UNIDADES[k]
+            else:
+                if((k > 30) & (n[2] != '0')):
+                    output += '%sY %s' % (DECENAS[int(n[1]) - 2], UNIDADES[int(n[2])])
+                else:
+                    output += '%s%s' % (DECENAS[int(n[1]) - 2], UNIDADES[int(n[2])])
+            return output
+        #raise osv.except_osv('Alerta', number)
+        number=str(round(float(number),2))
+        separate = number.split(".")
+        number = int(separate[0])
+
+        if int(separate[1]) >= 0:
+            moneda = "con " + str(separate[1]).ljust(2,'0') + "/" + "100 " 
+
+        """Converts a number into string representation"""
+        converted = ''
+        
+        if not (0 <= number < 999999999):
+            raise osv.except_osv('Alerta', number)
+            #return 'No es posible convertir el numero a letras'
+
+        
+        
+        number_str = str(number).zfill(9)
+        millones = number_str[:3]
+        miles = number_str[3:6]
+        cientos = number_str[6:]
+        
+
+        if(millones):
+            if(millones == '001'):
+                converted += 'UN MILLON '
+            elif(int(millones) > 0):
+                converted += '%sMILLONES ' % __convert_group(millones)
+
+        if(miles):
+            if(miles == '001'):
+                converted += 'MIL '
+            elif(int(miles) > 0):
+                converted += '%sMIL ' % __convert_group(miles)
+
+        if(cientos):
+            if(cientos == '001'):
+                converted += 'UN '
+            elif(int(cientos) > 0):
+                converted += '%s ' % __convert_group(cientos)
+        if float(number_str)==0:
+            converted += 'CERO '
+        converted += moneda
+
+        return converted.upper()
+
+

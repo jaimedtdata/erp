@@ -13,10 +13,10 @@ class HrSalaryRuleCategory(models.Model):
     _inherit = 'hr.salary.rule.category'
     _order = 'secuencia'
 
-    secuencia = fields.Integer(required=True, index=True, default=10)
+    secuencia = fields.Integer(required=False, default=10)
     aparece_en_nomina = fields.Boolean(string='Aparece en nomina',
-                                       help="Si esta checado significa que la categoria aparecera en los reportes", default=True, required=True)
+                                       help="Si esta checado significa que la categoria aparecera en los reportes", default=True, required=False)
     is_ing_or_desc = fields.Selection([
         ('ingreso', 'Ingreso'),
         ('descuento', 'Descuento'),
-    ], string='Ingreso o descuento', index=True, required=True, default='descuento', help="Decide donde posicionar la columna en el reporte")
+    ], string='Ingreso o descuento', required=False, default='descuento', help="Decide donde posicionar la columna en el reporte")

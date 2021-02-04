@@ -22,9 +22,9 @@
         <field name="arch" type="xml">
             <xpath expr="//form/group[2]" position="before">
                 <group string="Parametros reporte">
-                    <field name="secuencia" />
-                    <field name="is_ing_or_desc" widget="radio" />
-                    <field name="aparece_en_nomina"/>
+                    <field name="secuencia" required="1"/>
+                    <field name="is_ing_or_desc" widget="radio" required="1"/>
+                    <field name="aparece_en_nomina" required="1"/>
                 </group>
             </xpath>
         </field>

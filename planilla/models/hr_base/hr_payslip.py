@@ -11,6 +11,8 @@ from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_RIGHT, TA_LEFT
+from decimal import *
+from math import modf
 
 
 class HrPayslip(models.Model):
@@ -48,6 +50,8 @@ class HrPayslip(models.Model):
 
     afiliacion_rel = fields.Char(
         'Afiliacion', related='contract_id.afiliacion_id.entidad')
+    periodos_devengue = fields.One2many('hr.devengue','slip_id')
+    essalud = fields.Float()
 
     @api.multi
     def action_payslip_cancel(self):
@@ -57,52 +61,72 @@ class HrPayslip(models.Model):
     @api.multi
     def imprimir_boleta(self):
         self.ensure_one()
-        payslip = self
+        dias_no_laborados,dias_laborados,first,second,dias_faltas = 0,0,0,0,0
+        payslips = self.env['hr.payslip'].search([('payslip_run_id','=',self.payslip_run_id.id),('employee_id','=',self.employee_id.id)])
         planilla_ajustes = self.env['planilla.ajustes'].search([], limit=1)
-
+        try:
+            ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
+        except: 
+            raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
         archivo_pdf = SimpleDocTemplate(
-            "planilla_tmp.pdf", pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=20)
+            ruta+"planilla_tmp.pdf", pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=20)
 
         elements = []
-        company = payslip.company_id.partner_id
+        company = self.env['res.company'].search([], limit=1)
         categories = self.env['hr.salary.rule.category'].search(
             [('aparece_en_nomina', '=', True)], order="secuencia")
-        print "mis codigos ", planilla_ajustes.cod_dias_no_laborados.codigo
-        dias_no_laborados = int(payslip.worked_days_line_ids.search(
-            [('code', '=', planilla_ajustes.cod_dias_no_laborados.codigo if planilla_ajustes else ''), ('payslip_id', '=', payslip.id)], limit=1).number_of_days)
-        print "mi payslip_run ", payslip
-        print "mis dias no laborados ", dias_no_laborados
-        print "mis dias calendarios ", str(
-            payslip.dias_calendarios), " fin "
-        dias_laborados = int(payslip.dias_calendarios-dias_no_laborados)
-        dias_subsidiados = int(payslip.worked_days_line_ids.search(
-            [('code', '=', planilla_ajustes.cod_dias_subsidiados.codigo if planilla_ajustes else ''), ('payslip_id', '=', payslip.id)]).number_of_days)
+
+        for payslip in payslips:
+            dias_no_laborados += int(payslip.worked_days_line_ids.search([('code', '=', planilla_ajustes.cod_dias_no_laborados.codigo if planilla_ajustes else ''), 
+                                                                        ('payslip_id', '=', payslip.id)], limit=1).number_of_days)
+        for payslip in payslips:
+            if not payslip.contract_id.hourly_worker:
+                dias_laborados += int(payslip.worked_days_line_ids.search([('code', '=', planilla_ajustes.cod_dias_laborados.codigo if len(planilla_ajustes) > 0 else ''), 
+                                                                    ('payslip_id', '=', payslip.id)], limit=1).number_of_days)
+        dias_laborados=dias_laborados-self.feriados if dias_laborados > 0 else 0
+        if not planilla_ajustes.cod_dias_subsidiados:
+            raise UserError('Falta configurar codigos de dias subsidiados en Parametros de Boleta.')
+        wd_codes = planilla_ajustes.cod_dias_subsidiados.mapped('codigo')
+        dias_subsidiados = 0
+        for payslip in payslips:
+            wds = filter(lambda l:l.code in wd_codes and l.payslip_id == payslip,payslip.worked_days_line_ids)
+            dias_subsidiados += sum([int(i.number_of_days) for i in wds])
 
         query_horas_sobretiempo = '''
         select sum(number_of_days) as dias ,sum(number_of_hours) as horas ,sum(minutos) as minutos from hr_payslip_worked_days
         where (code = 'HE25' OR code = 'HE35' or code = 'HE100')
-        and payslip_id=%d
-        ''' % (payslip.id)
+        and payslip_id in (%s)
+        ''' % (','.join(str(i) for i in payslips.mapped('id')))
 
         self.env.cr.execute(query_horas_sobretiempo)
         # str(int(self.env.cr.dictfetchone()['horas']))
         total_sobretiempo = self.env.cr.dictfetchone()
+        for payslip in payslips:
+            dias_faltas += self.env['hr.payslip.worked_days'].search([('code', '=', planilla_ajustes.cod_dias_no_laborados.codigo if planilla_ajustes else ''), 
+                                                                    ('payslip_id', '=', payslip.id)], limit=1).number_of_days
+        if self.employee_id.calendar_id:
+            total = self.employee_id.calendar_id.average_hours if self.employee_id.calendar_id.average_hours > 0 else 8
+        else:
+            total = 8
+            #raise UserError(u'Este empleado no tiene un Horario establecido.')
+        total_horas_jornada_ordinaria = 0
+        for payslip in payslips:
+            if payslip.contract_id.hourly_worker:
+                total_horas_jornada_ordinaria += sum(payslip.worked_days_line_ids.filtered(lambda l:l.code == planilla_ajustes.cod_dias_laborados.codigo).mapped('number_of_hours'))
 
-        dias_faltas = self.env['hr.payslip.worked_days'].search(
-            [('code', '=', planilla_ajustes.cod_dias_no_laborados.codigo if planilla_ajustes else ''), ('payslip_id', '=', payslip.id)], limit=1)
-        print "MIS HORAS SOBRETIEMPO ", query_horas_sobretiempo
+        if self.employee_id.calendar_id:
+            total = self.employee_id.calendar_id.average_hours if self.employee_id.calendar_id.average_hours > 0 else 8
+        else:
+            total = 8
         # formula para los dias laborados segun sunat
-        total_horas_jornada_ordinaria = int(
-            30-payslip.feriados-dias_faltas.number_of_days if dias_faltas else 0)*8
-
-        print dias_laborados, dias_no_laborados, dias_subsidiados, total_horas_jornada_ordinaria, total_sobretiempo,
-
+        total_horas_minutos = modf(int(dias_laborados-dias_faltas)*total) if total_horas_jornada_ordinaria == 0 else total_horas_jornada_ordinaria
+        total_horas_jornada_ordinaria = total_horas_minutos[1]
+        total_minutos_jornada_ordinaria = Decimal(str(total_horas_minutos[0] * 60)).quantize(Decimal('1.'), rounding=ROUND_HALF_UP)
         # busco cualquier campo ya que lo unico que quiero es usar la funcionalidad de la generacion de la boleta
         payslip_run = self.env['hr.payslip.run']
 
-        payslip_run.genera_boleta_empleado(self.date_from, self.date_to, payslip.employee_id, str(dias_no_laborados), str(dias_laborados), str(total_horas_jornada_ordinaria), (total_sobretiempo), str(dias_subsidiados), elements,
+        payslip_run.genera_boleta_empleado(self.date_from, self.date_to, payslips, str(dias_no_laborados), str(int(dias_laborados - dias_faltas)), str(total_horas_jornada_ordinaria), str(total_minutos_jornada_ordinaria), (total_sobretiempo), str(dias_subsidiados), elements,
                                            company, categories, planilla_ajustes)
-
         archivo_pdf.build(elements)
 
         import sys
@@ -110,8 +134,8 @@ class HrPayslip(models.Model):
         sys.setdefaultencoding('iso-8859-1')
         import os
         vals = {
-            'output_name': 'Boleta-%s.pdf' % (payslip.employee_id.name+'-'+payslip.date_from+'-'+payslip.date_to),
-            'output_file': open("planilla_tmp.pdf", "rb").read().encode("base64"),
+            'output_name': 'Boleta-%s.pdf' % (payslip[0].employee_id.name+'-'+payslip[0].date_from+'-'+payslip[0].date_to),
+            'output_file': open(ruta+"planilla_tmp.pdf", "rb").read().encode("base64"),
         }
         sfs_id = self.env['planilla.export.file'].create(vals)
         return {
@@ -141,44 +165,17 @@ class HrPayslip(models.Model):
 
     @api.multi
     def compute_sheet(self):
-        print("Reescribiendo compute_sheet")
+        config = self.env['planilla.quinta.categoria'].search([])
+        if len(config) == 0:
+            raise ValidationError(
+                u'No esta configurado los parametros para Quinta Categoria')
+        config = config[0]
+        self.env.cr.execute("""delete from hr_payslip_line 
+                            where employee_id = """+str(self.employee_id.id)+""" and slip_id = """+str(self.id))
         super(HrPayslip, self).compute_sheet()
-
-        # parametros_gratificacion = self.env['planilla.gratificacion'].search(
-        #     [], limit=1).get_parametros_gratificacion()
-        # self.basico = self.line_ids.search(
-        #     [('code', '=', parametros_gratificacion.cod_basico.code), ('slip_id', '=', self.id)], limit=1).total
-        # self.asignacion_familiar = self.line_ids.search(
-        #     [('code', '=', parametros_gratificacion.cod_asignacion_familiar.code), ('slip_id', '=', self.id)], limit=1).total
-        # self.bonificacion_9 = self.line_ids.search(
-        #     [('code', '=', parametros_gratificacion.cod_bonificacion_9.code), ('slip_id', '=', self.id)], limit=1).total
-        # self.dias_faltas = self.worked_days_line_ids.search(
-        #     [('code', '=', parametros_gratificacion.cod_dias_faltas.codigo), ('payslip_id', '=', self.id)], limit=1).number_of_days
-        # self.comisiones = self.line_ids.search(
-        #     [('code', '=', parametros_gratificacion.cod_comisiones.code), ('slip_id', '=', self.id)], limit=1).total
-        # self.bonificaciones = self.line_ids.search(
-        #     [('code', '=', parametros_gratificacion.cod_bonificaciones.code), ('slip_id', '=', self.id)], limit=1).total
-        # self.sobretiempos = self.line_ids.search(
-        #     [('code', '=', parametros_gratificacion.cod_sobretiempos.code), ('slip_id', '=', self.id)], limit=1).total
-
-        # parametros_cts = self.env['planilla.cts'].search(
-        #     [], limit=1).get_parametros_cts()
-        # self.basico_cts = self.line_ids.search(
-        #     [('code', '=', parametros_cts.cod_basico.code), ('slip_id', '=', self.id)], limit=1).total
-        # self.asignacion_familiar_cts = self.line_ids.search(
-        #     [('code', '=', parametros_cts.cod_asignacion_familiar.code), ('slip_id', '=', self.id)], limit=1).total
-
-        # self.dias_faltas_cts = self.worked_days_line_ids.search(
-        #     [('code', '=', parametros_cts.cod_dias_faltas.codigo), ('payslip_id', '=', self.id)]).number_of_days
-
-        # self.sobretiempos_cts = self.line_ids.search(
-        #     [('code', '=', parametros_cts.cod_sobretiempos.code), ('slip_id', '=', self.id)], limit=1).total
-
-
 
     @api.multi
     def load_entradas_tareos(self):
-        #import pudb; pudb.set_trace()
 
         self.worked_days_line_ids.unlink()
         self.input_line_ids.unlink()
@@ -207,44 +204,16 @@ class HrPayslip(models.Model):
                     }
             self.env['hr.payslip.input'].create(data)
 
-    # name = fields.Char(string='Description', required=True)
-    # payslip_id = fields.Many2one('hr.payslip', string='Pay Slip', required=True, ondelete='cascade', index=True)
-    # sequence = fields.Integer(required=True, index=True, default=10)
-    # code = fields.Char(required=True, help="The code that can be used in the salary rules")
-    # amount = fields.Float(help="It is used in computation. For e.g. A rule for sales having "
-    #                            "1% commission of basic salary for per product can defined in expression "
-    #                            "like result = inputs.SALEURO.amount * contract.wage*0.01.")
-    # contract_id = fields.Many2one('hr.contract', string='Contract', required=True,
-    #     help="The contract for which applied this input")
+class HrDevengue(models.Model):
+    _name = 'hr.devengue'
 
-    # name = fields.Char(string='Description', required=True)
-    # payslip_id = fields.Many2one('hr.payslip', string='Pay Slip', required=True, ondelete='cascade', index=True)
-    # sequence = fields.Integer(required=True, index=True, default=10)
-    # code = fields.Char(required=True, help="The code that can be used in the salary rules")
-    # number_of_days = fields.Float(string='Number of Days')
-    # number_of_hours = fields.Float(string='Number of Hours')
-    # contract_id = fields.Many2one('hr.contract', string='Contract', required=True,
-    #     help="The contract for which applied this input")
+    slip_id = fields.Many2one('hr.payslip','Nomina')
+    periodo_devengue = fields.Many2one('hr.payslip.run','Periodo Devengue')
+    dias = fields.Integer('Dias de Vacaciones')
+    employee_id = fields.Many2one('hr.employee','Empleado')
 
-
-# class HrPayslipGratificacion(models.Model):
-#     _inherit = 'planilla.gratificacion.params.dic'
-#     _description = 'gratificacion de la nomina'
-#     # variables que se usaran en la nomina
-#     slip_id=fields.Many2one('hr.payslip')
-#     basico = fields.Float(string='Basico', digits=(12, 2))
-#     asignacion_familiar = fields.Float(
-#         string='Asignacion Familiar', digits=(12, 2))
-#     bonificacion_9 = fields.Float(string='Bonificacion 9%', digits=(12, 2))
-#     dias_faltas = fields.Float(string='Faltas', digits=(12, 2))
-
-# class HrPayslipGratificacion(models.Model):
-#     _inherit = 'planilla.gratificacion.params.dic'
-#     _description = 'gratificacion de la nomina'
-#     # variables que se usaran en la nomina
-#     slip_id=fields.Many2one('hr.payslip')
-#     basico = fields.Float(string='Basico', digits=(12, 2))
-#     asignacion_familiar = fields.Float(
-#         string='Asignacion Familiar', digits=(12, 2))
-#     bonificacion_9 = fields.Float(string='Bonificacion 9%', digits=(12, 2))
-#     dias_faltas = fields.Float(string='Faltas', digits=(12, 2))
+    @api.multi
+    def create(self,vals):
+        t = super(HrDevengue,self).create(vals)
+        t.write({'employee_id':self.env['hr.payslip'].browse(t.slip_id.id).employee_id.id})
+        return t

@@ -63,21 +63,25 @@ class PlanillaLiquidacion(models.Model):
         (12, "Diciembre"),
     ], string="Mes", required="1")
 
+    # no se esta usando abajo 
     date_start = fields.Date()
     date_end = fields.Date()
 
-    tipo_cambio = fields.Float("Tipo de Cambio", required=True, default=0)
-    # tipo = fields.Selection([('07', u"Gratificación Fiestas Patrias"),
-    #                          ('12', u"Gratificación Navidad")], "Mes", required=1)
+    tipo_cambio = fields.Float("Tipo de Cambio", required=True, default=1)
+
     plus_9 = fields.Boolean("Considerar Bono 9%")
-    # planilla_gratificacion_lines = fields.Many2one(
-    #     'planilla.gratificacion.line' , "Lineas",copy=True)
+
+    calcular_meses_dias = fields.Boolean("calcular meses y dias")
+
+
     planilla_cts_lines = fields.One2many(
         'planilla.liquidacion.cts.line', 'planilla_liquidacion_id', u'Línea CTS')
     planilla_gratificacion_lines = fields.One2many(
         'planilla.liquidacion.gratificacion.line', 'planilla_liquidacion_id', u'Línea Gratificacion')
     planilla_vacaciones_lines = fields.One2many(
         'planilla.liquidacion.vacaciones.line', 'planilla_liquidacion_id', u'Línea Vacaciones')
+    planilla_indemnizacion_lines = fields.One2many(
+        'planilla.liquidacion.indemnizacion.line', 'planilla_liquidacion_id', u'Línea Indemnizacion')
 
 
     def is_number_tryexcept(self,s):
@@ -89,9 +93,19 @@ class PlanillaLiquidacion(models.Model):
             return False
 
     @api.multi
+    def unlink(self):
+        nomina = self.env['hr.payslip.run'].search([('date_start', '=', self.date_start), 
+                                                    ('date_end', '=', self.date_end)])
+        nomina.write({'liqui_flag':False})
+        super(PlanillaLiquidacion,self).unlink()
+
+    @api.multi
     def cabezera(self,c,wReal,hReal,company):
         import os
-        # direccion = self.env['main.parameter'].search([])[0].dir_create_file
+        try:
+            direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
+        except:
+            raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 
         c.setFont("Arimo-Bold", 6)
         c.setFillColor(black)
@@ -106,16 +120,18 @@ class PlanillaLiquidacion(models.Model):
         c.drawCentredString((wReal/2.00),pos_inicial,company.name)
 
         imgdata = base64.b64decode(company.logo_web)
-        new_image_handle = open('company_logo_tmp.jpg', 'wb')
+        new_image_handle = open(direccion+'company_logo_tmp.jpg', 'wb')
         new_image_handle.write(imgdata)
         new_image_handle.close()
-        c.drawImage('company_logo_tmp.jpg',20, hReal-20, width=120, height=50,mask='auto')
+        if new_image_handle:
+            c.drawImage(direccion+'company_logo_tmp.jpg',20, hReal-40, width=120, height=50,mask='auto')
 
     @api.multi
     def verify_linea(self,c,wReal,hReal,posactual,valor,pagina):
         if posactual <10:
+            company = self.env['res.company'].search([], limit=1)[0]
             c.showPage()
-            self.cabezera(c,wReal,hReal)
+            self.cabezera(c,wReal,hReal,company)
 
             c.setFont("Arimo-Bold", 6)
             return pagina+1,hReal-60
@@ -132,17 +148,34 @@ class PlanillaLiquidacion(models.Model):
             'view_mode': 'form',
             "views": [[False, "form"]],
             "target": "new",
-            'context': {'current_id': self.id,'employees':[line.employee_id for line in self.planilla_vacaciones_lines]}            
+            'context': {'current_id': self.id,'employees':[line.employee_id.id for line in self.planilla_vacaciones_lines]}            
         }
+
+
+    @api.multi
+    def get_certificado_wizard(self):
+        return {
+            'name': 'Exportar certificado pdf',
+            "type": "ir.actions.act_window",
+            "res_model": "planilla.liquidacion.pdf.certificado.wizard",
+            'view_type': 'form',
+            'view_mode': 'form',
+            "views": [[False, "form"]],
+            "target": "new",
+            'context': {'current_id': self.id,'employees':[line.employee_id.id for line in self.planilla_vacaciones_lines]}            
+        }
+
+
 
     @api.multi
     def get_liquidacion_pdf(self,employee_ids):
         if not hasattr(employee_ids, '__iter__'):
             employee_ids = [employee_ids]
         self.reporteador(employee_ids)
+        direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
         vals = {
             'output_name': 'Planilla_liquidacion.pdf',
-            'output_file': open("planilla_tmp.pdf", "rb").read().encode("base64"),
+            'output_file': open(direccion+"planilla_tmp.pdf", "rb").read().encode("base64"),
         }
         sfs_id = self.env['planilla.export.file'].create(vals)
         return {
@@ -156,13 +189,14 @@ class PlanillaLiquidacion(models.Model):
     @api.multi
     def reporteador(self, employee_ids):
         company = self.env['res.company'].search([], limit=1)[0]
-
+        print(company.logo_web)
         reload(sys)
         sys.setdefaultencoding('iso-8859-1')
         width , height = A4  # 595 , 842
         wReal = width- 30
-        hReal = height - 40
-        c = canvas.Canvas( "planilla_tmp.pdf", pagesize=A4)
+        hReal = height - 90
+        direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
+        c = canvas.Canvas(direccion+"planilla_tmp.pdf", pagesize=A4)
         inicio = 0
         pos_inicial = hReal-60
         endl = 9
@@ -175,12 +209,13 @@ class PlanillaLiquidacion(models.Model):
         pdfmetrics.registerFont(TTFont('Arimo-Italic', ruta_modulo+ '/../../fonts/Arimo-Italic.ttf'))
         pdfmetrics.registerFont(TTFont('Arimo-Regular', ruta_modulo+'/../../fonts/Arimo-Regular.ttf'))
 
-
+        helper = self.env['planilla.helpers']
         hllv = self.planilla_vacaciones_lines.search([('employee_id','in',employee_ids),('planilla_liquidacion_id','=',self.id)])
         for i in hllv:
             self.cabezera(c,wReal,hReal,company)
-            hllg = self.planilla_gratificacion_lines.search([('employee_id','=',i.employee_id),('planilla_liquidacion_id','=',self.id)])[0]
-            hllc = self.planilla_cts_lines.search([('employee_id','=',i.employee_id),('planilla_liquidacion_id','=',self.id)])[0]
+            hllg = self.planilla_gratificacion_lines.search([('employee_id','=',i.employee_id.id),('planilla_liquidacion_id','=',self.id)])[0]
+            hllc = self.planilla_cts_lines.search([('employee_id','=',i.employee_id.id),('planilla_liquidacion_id','=',self.id)])[0]
+            indemnizacion = self.planilla_indemnizacion_lines.search([('employee_id','=',i.employee_id.id),('planilla_liquidacion_id','=',self.id)])[0]
             # employee_id = self.env['hr.employee'].search([''])
 
             total_sum = 0
@@ -188,7 +223,7 @@ class PlanillaLiquidacion(models.Model):
             c.setFont("Arimo-Bold", font_size)
             c.drawString( 30 , pos_inicial, u"DATOS PERSONALES")
             pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
-            c.drawString( 40 , pos_inicial, u"Nombres y Apellidos")
+            c.drawString( 40 , pos_inicial, u"Apellidos y Nombres")
             c.drawString( 140 , pos_inicial, u":")
             c.setFont("Arimo-Regular", font_size)
             c.drawString( 150 , pos_inicial, i.contract_id.employee_id.name_related if i.contract_id.employee_id.name_related else '')
@@ -462,6 +497,14 @@ class PlanillaLiquidacion(models.Model):
                 c.setFont("Arimo-Regular", font_size)
                 c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % hllg.total_gratificacion )) if hllg.total_gratificacion else "0.00" )
                 pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+            print indemnizacion
+            if indemnizacion.monto>0.0:
+                c.setFont("Arimo-Bold", font_size)
+                c.drawString( 40 , pos_inicial, u"Indemnizacion")
+                c.drawString( 170 , pos_inicial, u":")
+                c.setFont("Arimo-Regular", font_size)
+                c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % indemnizacion.monto )) if indemnizacion.monto else "0.00" )
+                pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
 
             # hfcdl = self.env['hr.five.category.devolucion.lines'].search([('devolucion_id.period_id','=',self.period_id.id),('employee_id','=',hllg.employee_id.id)])
             # if len(hfcdl):
@@ -515,7 +558,7 @@ class PlanillaLiquidacion(models.Model):
             c.setFont("Arimo-Bold", font_size)
             c.drawString( 30 , pos_inicial, u"OTROS INGRESOS")
             pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
-            tot_ingresos = i.total_vacaciones + hllc.cts_a_pagar + hllg.total_gratificacion + hllg.plus_9 
+            tot_ingresos = i.total_vacaciones + hllc.cts_a_pagar + hllg.total_gratificacion + hllg.plus_9 +indemnizacion.monto
             # for item in hllv.ingresos_lines:
             #     if item.monto:
             #         c.setFont("Arimo-Bold", font_size)
@@ -536,15 +579,15 @@ class PlanillaLiquidacion(models.Model):
             c.drawString( 40 , pos_inicial, u"Aportes Trabajador")
             pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
 
-            if i.onp:
-                c.setFont("Arimo-Bold", font_size)
-                c.drawString( 40 , pos_inicial, u"ONP")
-                c.drawString( 170 , pos_inicial, u":")
-                c.setFont("Arimo-Regular", font_size)
-                c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % i.onp )) if i.onp else "0.00" )
-                pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+            # if i.onp:
+            #     c.setFont("Arimo-Bold", font_size)
+            #     c.drawString( 40 , pos_inicial, u"ONP")
+            #     c.drawString( 170 , pos_inicial, u":")
+            #     c.setFont("Arimo-Regular", font_size)
+            #     c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % i.onp )) if i.onp else "0.00" )
+            #     pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
 
-            if i.afp_jub or i.afp_si or i.afp_com:
+            if i.contract_id.afiliacion_id.entidad.lower()!='onp':
                 c.setFont("Arimo-Bold", font_size)
                 c.drawString( 40 , pos_inicial, u"AFP. PENSIONES")
                 c.drawString( 170 , pos_inicial, u":")
@@ -563,6 +606,42 @@ class PlanillaLiquidacion(models.Model):
                 c.setFont("Arimo-Regular", font_size)
                 c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % i.afp_si )) if i.afp_si else "0.00" )
                 pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+
+                #onp
+                c.setFont("Arimo-Bold", font_size)
+                c.drawString( 40 , pos_inicial, u"IMPORTE ONP")
+                c.drawString( 170 , pos_inicial, u":")
+                c.setFont("Arimo-Regular", font_size)
+                c.drawRightString( 250 , pos_inicial, "0.00" )
+                pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+
+            else:
+                c.setFont("Arimo-Bold", font_size)
+                c.drawString( 40 , pos_inicial, u"AFP. PENSIONES")
+                c.drawString( 170 , pos_inicial, u":")
+                c.setFont("Arimo-Regular", font_size)
+                c.drawRightString( 250 , pos_inicial, "0.00")
+                pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+                c.setFont("Arimo-Bold", font_size)
+                c.drawString( 40 , pos_inicial, u"AFP. COM. PORC.")
+                c.drawString( 170 , pos_inicial, u":")
+                c.setFont("Arimo-Regular", font_size)
+                c.drawRightString( 250 , pos_inicial, "0.00" )
+                pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+                c.setFont("Arimo-Bold", font_size)
+                c.drawString( 40 , pos_inicial, u"AFP. SEGUROS")
+                c.drawString( 170 , pos_inicial, u":")
+                c.setFont("Arimo-Regular", font_size)
+                c.drawRightString( 250 , pos_inicial, "0.00")
+                pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+
+                c.setFont("Arimo-Bold", font_size)
+                c.drawString( 40 , pos_inicial, u"IMPORTE ONP")
+                c.drawString( 170 , pos_inicial, u":")
+                c.setFont("Arimo-Regular", font_size)
+                c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % i.onp )) if i.onp else "0.00" )
+                pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+
             # if i.afp_2p:
             #     c.setFont("Arimo-Bold", font_size)
             #     c.drawString( 40 , pos_inicial, u"AFP. 2%")
@@ -570,14 +649,15 @@ class PlanillaLiquidacion(models.Model):
             #     c.setFont("Arimo-Regular", font_size)
             #     c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % i.afp_2p )) if i.afp_2p else "0.00" )
             #     pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
-            if i.afp_jub:
-                c.setFont("Arimo-Bold", font_size)
-                c.drawString( 40 , pos_inicial, u"FONDO DE JUBILACION")
-                c.drawString( 170 , pos_inicial, u":")
-                c.setFont("Arimo-Regular", font_size)
-                c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % i.afp_jub )) if i.afp_jub else "0.00" )
-                pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
-            tot_descuentos = i.onp + i.afp_jub + i.afp_si + i.afp_com + i.afp_jub
+            # if i.afp_jub:
+            #     c.setFont("Arimo-Bold", font_size)
+            #     c.drawString( 40 , pos_inicial, u"IMPORTE ONP")
+            #     c.drawString( 170 , pos_inicial, u":")
+            #     c.setFont("Arimo-Regular", font_size)
+            #     c.drawRightString( 250 , pos_inicial, '{:,.2f}'.format(decimal.Decimal ("%0.2f" % i.afp_jub )) if i.afp_jub else "0.00" )
+            #     pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
+
+            tot_descuentos = i.onp + i.afp_jub + i.afp_si + i.afp_com 
             pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl,pagina)
             c.setFont("Arimo-Bold", font_size)
             c.drawString( 30 , pos_inicial, u"OTROS DESCUENTOS")
@@ -612,8 +692,9 @@ class PlanillaLiquidacion(models.Model):
             c.setFont("Arimo-Regular", font_size)
             c.drawString( 40 , pos_inicial, u"SON")
             c.setFont("Arimo-Bold", font_size)
-            tot_tot = '{:,.2f}'.format(decimal.Decimal ("%0.2f" % (tot_ingresos - tot_descuentos) ))
-            c.drawString( 55 , pos_inicial, str(float(tot_tot.replace(',',''))).capitalize() + " soles")
+            tot_tot = tot_ingresos - tot_descuentos
+            c.drawString( 55 , pos_inicial, helper.number_to_letter(tot_tot) + " soles")
+            #str(float(tot_tot.replace(',',''))).capitalize()
             pagina, pos_inicial = self.verify_linea(c,wReal,hReal,pos_inicial,endl*3,pagina)
 
             c.setFont("Arimo-Regular", font_size)
@@ -705,20 +786,20 @@ class PlanillaLiquidacion(models.Model):
         sys.setdefaultencoding('iso-8859-1')
         output = io.BytesIO()
 
-        # direccion = self.env['main.parameter'].search([])[0].dir_create_file
-        workbook = Workbook('Liquidacion%s-%s.xlsx' % (self.year, self.month))
+        direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
+        workbook = Workbook(direccion+'Liquidacion%s-%s.xlsx' % (self.year, self.month))
         worksheet = workbook.add_worksheet(
             'gratificacion%s-%s.xlsx' % (self.year, self.month))
         worksheet.set_tab_color('red')
 
         lines = self.planilla_gratificacion_lines
-        self.env['planilla.gratificacion'].getSheetGratificacion(workbook,worksheet,lines)
+        self.env['planilla.gratificacion'].getSheetGratificacion(workbook,worksheet,lines,self.year)
         
         lines = self.planilla_cts_lines
         worksheet = workbook.add_worksheet(
             'CTS%s-%s.xlsx' % (self.year, self.month))
         worksheet.set_tab_color('green')
-        self.env['planilla.cts'].getCTSSheet(workbook,worksheet,lines)
+        self.env['planilla.cts'].getCTSSheet(workbook,worksheet,lines,self.year)
             
         lines = self.planilla_vacaciones_lines
         worksheet = workbook.add_worksheet(
@@ -730,7 +811,7 @@ class PlanillaLiquidacion(models.Model):
             
         workbook.close()
 
-        f = open('Liquidacion%s-%s.xlsx' % (self.year, self.month), 'rb')
+        f = open(direccion+'Liquidacion%s-%s.xlsx' % (self.year, self.month), 'rb')
 
         vals = {
             'output_name': 'Liquidacion%s-%s.xlsx' % (self.year, self.month),
@@ -786,10 +867,9 @@ class PlanillaLiquidacion(models.Model):
             {'valign': 'vcenter', 'align': 'right', 'border': 1, 'num_format': '#,##0.00'})
 
         title = workbook.add_format({'bold': True, 'font_name': 'Arial'})
-        title.set_align('center')
         title.set_align('vcenter')
         # title.set_text_wrap()
-        title.set_font_size(18)
+        title.set_font_size(15)
         company = self.env['res.company'].search([], limit=1)[0]
 
         x = 0
@@ -797,18 +877,13 @@ class PlanillaLiquidacion(models.Model):
         import sys
         reload(sys)
         sys.setdefaultencoding('iso-8859-1')
-        worksheet.merge_range(
-            'D1:O1', u"PLANILLA DE SUELDOS Y SALARIOS", title)
-        worksheet.set_row(x, 29)
+        worksheet.merge_range('A1:B1', company.name.strip(), title)
+        worksheet.merge_range('A2:D2', "VACACIONES", bold)
         x = x+2
 
-        worksheet.write(x, 0, u"Empresa:", bold)
-        worksheet.write(x, 1, company.name, formatLeft)
-
         x = x+1
-        worksheet.write(x, 0, u"Mes:", bold)
-        worksheet.write(
-            x, 1,dict(self._fields['month'].selection).get(self.month))
+        worksheet.write("A3", u"Mes:", bold)
+        worksheet.write("B3",dict(self._fields['month'].selection).get(self.month),bold)
 
         x = x+3
 
@@ -879,21 +954,15 @@ class PlanillaLiquidacion(models.Model):
         from planilla_liquidacion_vacaciones_line where planilla_liquidacion_id =%d
         
         """%(self.id)
-        print query
         self.env.cr.execute(query)
         datos_planilla = self.env.cr.fetchall()
         range_row = len(datos_planilla[0] if len(datos_planilla) > 0 else 0)
-        print datos_planilla
         x_ini=x
         for i in range(len(datos_planilla)):
             for j in range(range_row):
                 if j == 0 or j == 1:
-                    if self.is_number_tryexcept(datos_planilla[i][j]):
-                        worksheet.write_number(
-                            x, j, float(datos_planilla[i][j]) if datos_planilla[i][j] else 0.00, formatLeft)
-                    else:
-                        worksheet.write(
-                            x, j, datos_planilla[i][j] if datos_planilla[i][j] else '0.00', formatLeft)
+                    worksheet.write(
+                        x, j, datos_planilla[i][j] if datos_planilla[i][j] else '0.00', formatLeft)
                 else:
                     if self.is_number_tryexcept(datos_planilla[i][j]):
                         worksheet.write_number(
@@ -914,7 +983,8 @@ class PlanillaLiquidacion(models.Model):
         helper_liquidacion = self.env['planilla.helpers']
         # seteando tamaño de columnas
         col_widths =helper_liquidacion.get_col_widths(datos_planilla)
-        worksheet.set_column(0, 0, col_widths[0]-10)
+        
+        worksheet.set_column(0, 0, col_widths[0])
         worksheet.set_column(1, 1, col_widths[1]-7)
         for i in range(2, len(col_widths)):
             worksheet.set_column(i, i, col_widths[i])
@@ -925,6 +995,7 @@ class PlanillaLiquidacion(models.Model):
         self.planilla_gratificacion_lines.unlink()
         self.planilla_cts_lines.unlink()
         self.planilla_vacaciones_lines.unlink()
+        self.planilla_indemnizacion_lines.unlink()
 
         mes_periodo = self.month
         days = calendar.monthrange(int(self.year), mes_periodo)[1]
@@ -940,20 +1011,10 @@ class PlanillaLiquidacion(models.Model):
             int(self.year), mes_periodo, days)
 
         if mes_periodo >= 1 and mes_periodo <= 6:
-            # el rango fin deberia ser 30 del mes 6
-            # pero para asegurarme que al menos haya
-            # un mes para que se le pague la gratificacion
-            # le aumentare la fecha final que sea mayor a 31 del mes 7
-            # ya que si es menor a esa fecha o bien seso y bien sesara el mes 7
-            # por lo que le corresponderia no gratificacion sino liquidacion
-            #
-            # para el rango de inicio para asegurarme de que tenga al menos un mes
-            # el rango de inicio de resumen_periodo deberia ser como minimo menor o igual a el 1 del mes 6
             rango_inicio_contrato = date(int(self.year), 6, 1)
             rango_fin_contrato = date(int(self.year), 6, 30)
             rango_inicio_planilla = date(int(self.year), 1, 1)
             rango_fin_planilla = date(int(self.year), 6, 30)
-            tabla_montos_primera_mitad = True
         else:
             rango_inicio_contrato = date(int(self.year), 12, 1)
             # rango_fin_contrato = date(int(self.year), 12, 31) #30 nov
@@ -963,68 +1024,76 @@ class PlanillaLiquidacion(models.Model):
             rango_fin_planilla = date(int(self.year), 11, 30)
 
         if mes_periodo >= 5 and mes_periodo <= 10:  # mayo a octubre
-            # el rango fin deberia ser 31 del mes 10
-            # pero para asegurarme que al menos haya
-            # un mes para que se le pague la cts
-            # le aumentare la fecha final(para control resumen_periodo) que sea mayor a 31 del mes 10
-            # ya que si es menor a esa fecha o bien seso y bien sesara el mes 7
-            # por lo que le corresponderia no cts sino liquidacion
-            #
-            # para el rango de inicio para asegurarme de que tenga al menos un mes
-            # el rango de inicio de resumen_periodo deberia ser como minimo menor o igual a el 1 del mes 10
-
             rango_inicio_planilla_cts = date(int(self.year), 5, 1)
             rango_fin_planilla_cts = date(int(self.year), 10, 31)
             # se usa para sacar los dia del periodo anterior
-            anho_periodo_anterior_cts = int(self.year)-1
+            anho_periodo_anterior_cts = int(self.year)
             tipo_cts = '12'
+            tipo_gratificacion = '07'
 
         elif mes_periodo >= 1 and mes_periodo <= 4:  # enero a abril
-
             rango_inicio_planilla_cts = date(int(self.year)-1, 11, 1)
             rango_fin_planilla_cts = date(int(self.year), 4, 30)
             # se usa para sacar los dia del periodo anterior
             anho_periodo_anterior_cts = int(self.year)-1
-            tipo_cts = '12'
+            tipo_cts = '07'
+            tipo_gratificacion = '12'
         else:  # solo queda noviembre y diciembre
             rango_inicio_planilla_cts = date(int(self.year), 11, 1)
             rango_fin_planilla_cts = date(int(self.year)+1, 4, 30)
             # se usa para sacar los dia del periodo anterior
             anho_periodo_anterior_cts = int(self.year)
             tipo_cts = '07'
+            tipo_gratificacion ='07'
 
-        parametros_eps = self.env['planilla.parametros.essalud.eps'].get_parametros_essalud_eps(
-        )
+        if mes_periodo == 12:
+            tipo_gratificacion = '12'
 
         contratos_empleado = self.env['hr.contract'].search(
-            [('date_end', '>=', date_start_liquidacion_vacaciones), ('date_end', '<=', date_end_liquidacion_vacaciones), ('state', '!=', 'close')])
-
-        for contrato in contratos_empleado:
+            [('date_end', '>=', date_start_liquidacion_vacaciones), 
+            ('date_end', '<=', date_end_liquidacion_vacaciones),
+            ('regimen_laboral_empresa','not in',['practicante','microempresa']),
+            ])
+        
+        for e,contrato in enumerate(contratos_empleado,1):
             # 1 busco los contratos de ese empleado
             contratos_empleado = self.env['hr.contract'].search(
-                [('employee_id', '=', contrato.employee_id.id), ('date_end', '<=', contrato.date_end)], order='date_end desc')
-            # datetime
-            fecha_ini = fields.Date.from_string(
-                contratos_empleado[0].date_start)
+                [('employee_id', '=', contrato.employee_id.id), 
+                ('date_end', '<=', contrato.date_end)], order='date_end desc')
+            if len(contratos_empleado) > 0:    
+                # datetime
+                fecha_ini = fields.Date.from_string(
+                    contratos_empleado[0].date_start)
+                fecha_fin_contrato = fields.Date.from_string(
+                    contratos_empleado[0].date_end)
+                # 2 busco los contratos anteriores que esten continuos(no mas de un dia de diferencia entre contratos)
+                for i in range(1, len(contratos_empleado)):
+                    c_empleado = contratos_empleado[i]
+                    fecha_fin = fields.Date.from_string(c_empleado.date_end)
+                    if abs(((fecha_fin)-(fecha_ini)).days) == 1:
+                        fecha_ini = fields.Date.from_string(c_empleado.date_start)
+                if self.month == 12:
+                    grati = self.env['planilla.gratificacion'].search([('year','=',self.year),('tipo','=',self.month)])
+                    employee_filtered = filter(lambda g:g.employee_id.id == contrato.employee_id.id,grati.planilla_gratificacion_lines)
+                    if not employee_filtered:
+                        self.calcular_gratificacion(contrato, rango_inicio_planilla, rango_fin_planilla,
+                                                    fecha_ini, fecha_fin_contrato, date_start_liquidacion, date_end_liquidacion,e)
+                else:
+                    self.calcular_gratificacion(contrato, rango_inicio_planilla, rango_fin_planilla,
+                                                    fecha_ini, fecha_fin_contrato, date_start_liquidacion, date_end_liquidacion,e)
+                self.calcular_cts(contrato, rango_inicio_planilla_cts, rango_fin_planilla_cts,
+                                  fecha_ini, fecha_fin_contrato, date_start_liquidacion, date_end_liquidacion, anho_periodo_anterior_cts, tipo_cts,tipo_gratificacion,e)
+                self.calcular_vacaciones(
+                    contrato, date_start_liquidacion_vacaciones, date_end_liquidacion_vacaciones, fecha_ini, fecha_fin_contrato,e)
+        
+        nomina = self.env['hr.payslip.run'].search([('date_start', '=', self.date_start), 
+                                                    ('date_end', '=', self.date_end)])
+        nomina.write({'liqui_flag':True})
 
-            fecha_fin_contrato = fields.Date.from_string(
-                contratos_empleado[0].date_end)
-            # 2 busco los contratos anteriores que esten continuos(no mas de un dia de diferencia entre contratos)
-            for i in range(1, len(contratos_empleado)):
-                c_empleado = contratos_empleado[i]
-                fecha_fin = fields.Date.from_string(c_empleado.date_end)
-                if abs(((fecha_fin)-(fecha_ini)).days) == 1:
-                    fecha_ini = fields.Date.from_string(c_empleado.date_start)
-
-            self.calcular_gratificacion(contrato, rango_inicio_planilla, rango_fin_planilla,
-                                        fecha_ini, fecha_fin_contrato, parametros_eps, date_start_liquidacion, date_end_liquidacion)
-            self.calcular_cts(contrato, rango_inicio_planilla_cts, rango_fin_planilla_cts,
-                              fecha_ini, fecha_fin_contrato, date_start_liquidacion, date_end_liquidacion, anho_periodo_anterior_cts, tipo_cts)
-            self.calcular_vacaciones(
-                contrato, date_start_liquidacion_vacaciones, date_end_liquidacion_vacaciones, fecha_ini, fecha_fin_contrato)
+        return self.env['planilla.warning'].info(title='Resultado de importacion', message="SE CALCULO LIQUIDACION DE MANERA EXITOSA!")
 
     @api.multi
-    def calcular_gratificacion(self, contrato, rango_inicio_planilla, rango_fin_planilla, fecha_ini, fecha_fin, parametros_eps, date_start_liquidacion, date_end_liquidacion):
+    def calcular_gratificacion(self, contrato, rango_inicio_planilla, rango_fin_planilla, fecha_ini, fecha_fin, date_start_liquidacion, date_end_liquidacion,e):
         self.ensure_one()
         ultimo_mes_no_cuenta = False
         helper_liquidacion = self.env['planilla.helpers']
@@ -1037,61 +1106,75 @@ class PlanillaLiquidacion(models.Model):
         dias_mes_cese = calendar.monthrange(
             int(self.year), fecha_fin.month)[1]
 
-        meses = helper_liquidacion.diferencia_meses_gratificacion(
-            fecha_computable, fecha_fin)
+        # meses = helper_liquidacion.diferencia_meses_gratificacion(
+        #     fecha_computable, fecha_fin)
 
+        meses, dias = helper_liquidacion.diferencia_meses_dias(
+                fecha_computable, fecha_fin)
+        if not self.calcular_meses_dias:
+            dias = 0
 
-        # 4 sacando basico afam y faltas
-        if fecha_fin.month-fecha_computable.month == 0:
-            # solo esta un mes o menos, no hay nomina anterior
-            basico = contrato.wage
-            faltas = 0.0
-            afam = 0.0
-            comisiones_periodo = 0.0
-            promedio_bonificaciones = 0.0
-            promedio_horas_trabajo_extra = 0.0
-            # fecha_computable = date(fecha_fin.year, fecha_ini.month, fecha_ini.day)
+        fecha_inicio_nominas = date(
+            fecha_computable.year, fecha_computable.month, 1)
+        fecha_fin_nominas = date(fecha_fin.year, fecha_fin.month, calendar.monthrange(fecha_fin.year, fecha_fin.month)[1])
+        fecha_fin_nominas = fecha_fin - relativedelta(months=0)
+        fecha_fin_nominas = date(fecha_fin_nominas.year, fecha_fin_nominas.month, calendar.monthrange(
+            fecha_fin_nominas.year, fecha_fin_nominas.month)[1])
+
+        sql = """
+            select min(hp.id),sum(hwd.number_of_days) as days,min(hp.name) as name
+            from hr_payslip hp
+            inner join hr_contract hc on hc.id = hp.contract_id
+            inner join hr_payslip_worked_days hwd on hwd.payslip_id = hp.id
+            where hp.date_from >= '%s'
+            and hp.date_to <= '%s'
+            and hp.employee_id = %d
+            and hc.regimen_laboral_empresa not in ('practicante','microempresa')
+            and hwd.code in (%s)
+            group by hp.employee_id, hp.payslip_run_id
+        """%(fecha_inicio_nominas,
+            fecha_fin_nominas,
+            contrato.employee_id.id,
+            ','.join("'%s'"%(wd.codigo) for wd in parametros_gratificacion.cod_wds))
+        self.env.cr.execute(sql)
+        conceptos = self.env.cr.dictfetchall()
+
+        verificar_meses, _ = helper_liquidacion.diferencia_meses_dias(
+            fecha_inicio_nominas, fecha_fin_nominas)
+        if len(conceptos) != verificar_meses:
+            fecha_encontradas = ' '.join(['\t-'+x['name']+'\n' for x in conceptos])
+            if not fecha_encontradas:
+                fecha_encontradas = '"No tiene nominas"'
+            raise UserError(
+                'Error en GRATIFICACION: El empleado %s debe tener nominas desde:\n %s hasta %s pero solo tiene nominas en las siguientes fechas:\n %s \nfaltan %d nominas, subsanelas por favor ' % (
+                    contrato.employee_id.name_related, fecha_inicio_nominas, fecha_fin_nominas, fecha_encontradas, abs(len(
+                        conceptos) - (verificar_meses))
+                ))
+        lines = []
+        if contrato.hourly_worker:
+            payslips = self.env['hr.payslip'].search([('employee_id','=',contrato.employee_id.id),
+                                                        ('date_from','>=',rango_inicio_planilla),
+                                                        ('date_to','<=',rango_fin_planilla)])
+            for payslip in payslips:
+                lines.append(next(iter(filter(lambda l:l.code == 'BAS',payslip.line_ids)),None))
+            basico = sum([line.amount for line in lines])/6.0
         else:
-            fecha_inicio_nominas = date(
-                fecha_computable.year, fecha_computable.month, 1)
-            fecha_fin_nominas = date(fecha_fin.year, fecha_fin.month, calendar.monthrange(
-                fecha_fin.year, fecha_fin.month)[1])
-            fecha_fin_nominas = fecha_fin - relativedelta(months=+1)
-            fecha_fin_nominas = date(fecha_fin_nominas.year, fecha_fin_nominas.month, calendar.monthrange(
-                fecha_fin_nominas.year, fecha_fin_nominas.month)[1])
+            basico = helper_liquidacion.getBasicoByDate(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_basico.code,True )  # conceptos[0].basico if conceptos else 0.0
+        if parametros_gratificacion.cod_dias_faltas:
+            faltas = helper_liquidacion.getSumFaltas(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_dias_faltas.codigo ) #sum([x.dias_faltas for x in conceptos])
+        else:
+            faltas = 0
+        afam = helper_liquidacion.getAsignacionFamiliarByDate(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_asignacion_familiar.code )  #conceptos[0].asignacion_familiar if conceptos else 0.0
 
-            conceptos = self.env['hr.payslip'].search([('date_from', '>=', fecha_inicio_nominas), (
-                'date_to', '<=', fecha_fin_nominas), ('employee_id', '=', contrato.employee_id.id)], order='date_to desc')
-
-            verificar_meses, _ = helper_liquidacion.diferencia_meses_dias(
-                fecha_inicio_nominas, fecha_fin_nominas)
-
-            if len(conceptos) != verificar_meses:
-                fecha_encontradas = ' '.join(
-                    ['\t-'+x.name+'\n' for x in conceptos])
-                if not fecha_encontradas:
-                    fecha_encontradas = '"No tiene nominas"'
-                raise UserError(
-                    'Error en GRATIFICACION: El empleado %s debe tener nominas desde:\n %s hasta %s pero solo tiene nominas en las siguientes fechas:\n %s \nfaltan %d nominas, subsanelas por favor ' % (
-                        contrato.employee_id.name_related, fecha_inicio_nominas, fecha_fin_nominas, fecha_encontradas, abs(len(
-                            conceptos) - (verificar_meses))
-                    ))
-
-            basico = helper_liquidacion.getBasicoByDate(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_basico.code )  # conceptos[0].basico if conceptos else 0.0
-            faltas = helper_liquidacion.getSumFaltas(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_dias_faltas.codigo ) #sum([x.dias_faltas for x in conceptos])
-            afam = helper_liquidacion.getAsignacionFamiliarByDate(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_asignacion_familiar.code )  #conceptos[0].asignacion_familiar if conceptos else 0.0
-
-            comisiones_periodo, promedio_bonificaciones, promedio_horas_trabajo_extra = helper_liquidacion.calcula_comision_gratificacion_hrs_extras(
-                contrato, fecha_computable, fecha_fin_nominas, meses, fecha_fin)
+        comisiones_periodo, promedio_bonificaciones, promedio_horas_trabajo_extra = helper_liquidacion.calcula_comision_gratificacion_hrs_extras(
+            contrato, fecha_inicio_nominas, fecha_fin_nominas, meses, fecha_fin)
 
         bonificacion_9 = 0
         bonificacion = promedio_bonificaciones
         comision = comisiones_periodo
-        dias = 0
-
-        rem_computable = basico + \
-            bonificacion+comision + \
-            afam+promedio_horas_trabajo_extra
+        rem_computable = basico + bonificacion+comision + afam + promedio_horas_trabajo_extra
+        if contrato.regimen_laboral_empresa == 'pequenhaempresa':
+                rem_computable = rem_computable/2.0
         monto_x_mes = round(rem_computable/6.0, 2)
         monto_x_dia = round(monto_x_mes/30.0, 2)
         monto_x_meses = round(
@@ -1099,30 +1182,24 @@ class PlanillaLiquidacion(models.Model):
         monto_x_dias = round(monto_x_dia*dias, 2)
         total_faltas = round(monto_x_dia*faltas, 2)
         total_gratificacion = (monto_x_meses+monto_x_dias)-total_faltas
-        if  contrato.employee_id.tipo_empresa=='microempresa':
-            total_gratificacion=0
-        elif contrato.employee_id.tipo_empresa=='pequenhaempresa':
-            total_gratificacion/=2.0
 
         if self.plus_9:
-            if contrato.tipo_seguro == 'essalud':
-                bonificacion_9 = parametros_eps.ratio_essalud / \
+            if contrato.seguro_salud_id:
+                bonificacion_9 =contrato.seguro_salud_id.porcentaje / \
                     100.0*float(total_gratificacion)
-            else:
-                bonificacion_9 = parametros_eps.ratio_eps / \
-                    100.0*float(total_gratificacion)
-
         vals = {
             'planilla_liquidacion_id': self.id,
-            'employee_id': contrato.employee_id,
+            'orden':e,
+            'employee_id': contrato.employee_id.id,
             'identification_number': contrato.employee_id.identification_id,
             'last_name_father': contrato.employee_id.a_paterno,
             'last_name_mother': contrato.employee_id.a_materno,
-            'names': contrato.employee_id.name_related,
+            'names': contrato.employee_id.nombres,
             'fecha_ingreso': fecha_ini,
             'fecha_computable': fecha_computable,
             'fecha_cese': fecha_fin,
             'meses': meses,
+            'dias': dias,
             'faltas': faltas,
             'basico': basico,
             'a_familiar': afam,
@@ -1139,14 +1216,12 @@ class PlanillaLiquidacion(models.Model):
             'plus_9': bonificacion_9,
             'total': total_gratificacion+bonificacion_9
         }
-        print "liquidacion final para ", contrato.employee_id.name_related
-        print vals
 
         self.planilla_gratificacion_lines.create(vals)
         return True
 
     @api.multi
-    def calcular_cts(self, contrato, rango_inicio_planilla, rango_fin_planilla, fecha_ini, fecha_fin, date_start_liquidacion, date_end_liquidacion, anho_periodo_anterior_cts, tipo_cts):
+    def calcular_cts(self, contrato, rango_inicio_planilla, rango_fin_planilla, fecha_ini, fecha_fin, date_start_liquidacion, date_end_liquidacion, anho_periodo_anterior_cts, tipo_cts,tipo_gratificacion,e):
         self.ensure_one()
         ultimo_mes_no_cuenta = False
         helper_liquidacion = self.env['planilla.helpers']
@@ -1165,88 +1240,103 @@ class PlanillaLiquidacion(models.Model):
         meses, dias = helper_liquidacion.diferencia_meses_dias(
             fecha_computable, fecha_fin)
 
-        meses, dias = helper_liquidacion.diferencia_meses_dias(
-            fecha_computable, fecha_fin)
+        fecha_inicio_nominas = date(
+            fecha_computable.year, fecha_computable.month, 1)
+        fecha_fin_nominas = fecha_fin - relativedelta(months=0)
+        fecha_fin_nominas = date(fecha_fin_nominas.year, fecha_fin_nominas.month, calendar.monthrange(
+            fecha_fin_nominas.year, fecha_fin_nominas.month)[1])
 
-        # 4 sacando basico afam y faltas
-        if fecha_fin.month-fecha_computable.month == 0:
-            # solo esta un mes o menos, no hay nomina anterior
-            basico = contrato.wage
-            faltas = 0.0
-            afam = 0.0
-            comisiones_periodo = 0.0
-            promedio_bonificaciones = 0.0
-            promedio_horas_trabajo_extra = 0.0
-            # fecha_computable = date(fecha_fin.year, fecha_ini.month, fecha_ini.day)
-            gratificacion = 0.0
-        else:
+        sql = """
+            select min(hp.id),sum(hwd.number_of_days) as days,min(hp.name) as name
+            from hr_payslip hp
+            inner join hr_contract hc on hc.id = hp.contract_id
+            inner join hr_payslip_worked_days hwd on hwd.payslip_id = hp.id
+            where hp.date_from >= '%s'
+            and hp.date_to <= '%s'
+            and hp.employee_id = %d
+            and hc.regimen_laboral_empresa not in ('practicante','microempresa')
+            and hwd.code in (%s)
+            group by hp.employee_id, hp.payslip_run_id
+        """%(fecha_inicio_nominas,
+            fecha_fin_nominas,
+            contrato.employee_id.id,
+            ','.join("'%s'"%(wd.codigo) for wd in parametros_gratificacion.cod_wds)
+            )
+        self.env.cr.execute(sql)
+        conceptos = self.env.cr.dictfetchall()
 
-            fecha_inicio_nominas = date(
-                fecha_computable.year, fecha_computable.month, 1)
-            fecha_fin_nominas = fecha_fin - relativedelta(months=+1)
-            fecha_fin_nominas = date(fecha_fin_nominas.year, fecha_fin_nominas.month, calendar.monthrange(
-                fecha_fin_nominas.year, fecha_fin_nominas.month)[1])
+        # meses-1#meses-1 if ultimo_mes_no_cuenta else meses
+        verificar_meses, _ = helper_liquidacion.diferencia_meses_dias(
+            fecha_inicio_nominas, fecha_fin_nominas)
 
-            conceptos = self.env['hr.payslip'].search([('date_from', '>=', fecha_inicio_nominas), (
-                'date_to', '<=', fecha_fin_nominas), ('employee_id', '=', contrato.employee_id.id)], order='date_to desc')
-
+        if len(conceptos) != verificar_meses:
             fecha_encontradas = ' '.join(
-                ['\t-'+x.name+'\n' for x in conceptos])
-            # meses-1#meses-1 if ultimo_mes_no_cuenta else meses
-            verificar_meses, _ = helper_liquidacion.diferencia_meses_dias(
-                fecha_inicio_nominas, fecha_fin_nominas)
+                ['\t-'+x['name']+'\n' for x in conceptos])
+            if not fecha_encontradas:
+                fecha_encontradas = '"No tiene nominas"'
+            raise UserError(
+                'Error en CTS: El empleado %s debe tener nominas desde:\n %s hasta %s pero solo tiene nominas en las siguientes fechas:\n %s \nfaltan %d nominas, subsanelas por favor ' % (
+                    contrato.employee_id.name_related, fecha_inicio_nominas, fecha_fin_nominas, fecha_encontradas, abs(len(
+                        conceptos) - (verificar_meses))
+                ))
+        lines = []
+        if contrato.hourly_worker:
+            payslips = self.env['hr.payslip'].search([('employee_id','=',contrato.employee_id.id),
+                                                        ('date_from','>=',rango_inicio_planilla),
+                                                        ('date_to','<=',rango_fin_planilla)])
+            for payslip in payslips:
+                lines.append(next(iter(filter(lambda l:l.code == 'BAS',payslip.line_ids)),None))
+            basico = sum([line.amount for line in lines])/6.0
+        else:
+            basico = helper_liquidacion.getBasicoByDate(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_basico.code,True)  # conceptos[0].basico if conceptos else 0.0
+        if parametros_gratificacion.cod_dias_faltas:
+            faltas = helper_liquidacion.getSumFaltas(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_dias_faltas.codigo ) #sum([x.dias_faltas for x in conceptos])
+        else:
+            faltas = 0
+        afam = helper_liquidacion.getAsignacionFamiliarByDate(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_asignacion_familiar.code )  #conceptos[0].asignacion_familiar if conceptos else 0.0
 
-            if len(conceptos) != verificar_meses:
-                fecha_encontradas = ' '.join(
-                    ['\t-'+x.name+'\n' for x in conceptos])
-                if not fecha_encontradas:
-                    fecha_encontradas = '"No tiene nominas"'
-                raise UserError(
-                    'Error en CTS: El empleado %s debe tener nominas desde:\n %s hasta %s pero solo tiene nominas en las siguientes fechas:\n %s \nfaltan %d nominas, subsanelas por favor ' % (
-                        contrato.employee_id.name_related, fecha_inicio_nominas, fecha_fin_nominas, fecha_encontradas, abs(len(
-                            conceptos) - (verificar_meses))
-                    ))
-
-            basico = helper_liquidacion.getBasicoByDate(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_basico.code )  # conceptos[0].basico if conceptos else 0.0
-            faltas = helper_liquidacion.getSumFaltas(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_dias_faltas.codigo ) #sum([x.dias_faltas for x in conceptos])
-            afam = helper_liquidacion.getAsignacionFamiliarByDate(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id.id,parametros_gratificacion.cod_asignacion_familiar.code )  #conceptos[0].asignacion_familiar if conceptos else 0.0
-
-
+        if fecha_fin.month == 7 and fecha_fin.day > 15:
             query_gratificacion = """
             select total_gratificacion/6.0 as gratificacion from planilla_gratificacion pg 
             inner join planilla_gratificacion_line pgl 
             on pgl.planilla_gratificacion_id= pg.id 
             where employee_id =%d and year='%s' and tipo='%s' 
-            """ % (contrato.employee_id, anho_periodo_anterior_cts, tipo_cts)
+            """ % (contrato.employee_id, fecha_fin.year, '07')
+        else:
+            query_gratificacion = """
+            select total_gratificacion/6.0 as gratificacion from planilla_gratificacion pg 
+            inner join planilla_gratificacion_line pgl 
+            on pgl.planilla_gratificacion_id= pg.id 
+            where employee_id =%d and year='%s' and tipo='%s' 
+            """ % (contrato.employee_id, anho_periodo_anterior_cts, tipo_gratificacion)
 
-            self.env.cr.execute(query_gratificacion)
-            gratificacion = self.env.cr.dictfetchone()
-            gratificacion = gratificacion['gratificacion'] if gratificacion else 0.0
+        self.env.cr.execute(query_gratificacion)
+        gratificacion = self.env.cr.dictfetchone()
+        gratificacion = gratificacion['gratificacion'] if gratificacion else 0.0
 
-            query_dias_pasados = """
-            select dias_proxima_fecha as dias_cts_periodo_anterior from planilla_cts pc 
-            inner join planilla_cts_line pcl 
-            on pc.id= pcl.planilla_cts_id
-            where employee_id=%d    and year='%s' and tipo='%s'
-            """ % (contrato.employee_id, anho_periodo_anterior_cts, tipo_cts)
+        query_dias_pasados = """
+        select dias_proxima_fecha as dias_cts_periodo_anterior from planilla_cts pc 
+        inner join planilla_cts_line pcl 
+        on pc.id= pcl.planilla_cts_id
+        where employee_id=%d    and year='%s' and tipo='%s'
+        """ % (contrato.employee_id, anho_periodo_anterior_cts, tipo_cts)
 
-            self.env.cr.execute(query_dias_pasados)
-            dias_cts_periodo_anterior = self.env.cr.dictfetchone()
-            dias_cts_periodo_anterior = dias_cts_periodo_anterior[
-                'dias_cts_periodo_anterior'] if dias_cts_periodo_anterior else 0
-            dias = dias+dias_cts_periodo_anterior
+        self.env.cr.execute(query_dias_pasados)
+        dias_cts_periodo_anterior = self.env.cr.dictfetchone()
+        dias_cts_periodo_anterior = dias_cts_periodo_anterior[
+            'dias_cts_periodo_anterior'] if dias_cts_periodo_anterior else 0
+        dias = dias+dias_cts_periodo_anterior
 
-            helper_liquidacion = self.env['planilla.helpers']
-            comisiones_periodo, promedio_bonificaciones, promedio_horas_trabajo_extra = helper_liquidacion.calcula_comision_gratificacion_hrs_extras(
-                contrato, fecha_computable, fecha_fin_nominas, meses, fecha_fin)
+        helper_liquidacion = self.env['planilla.helpers']
+        comisiones_periodo, promedio_bonificaciones, promedio_horas_trabajo_extra = helper_liquidacion.calcula_comision_gratificacion_hrs_extras(
+            contrato, fecha_computable, fecha_fin_nominas, meses, fecha_fin)
 
         bonificacion = promedio_bonificaciones
         comision = comisiones_periodo
 
-        rem_computable = basico+afam + \
-            gratificacion + bonificacion + \
-            comision + promedio_horas_trabajo_extra
-
+        rem_computable = basico+afam + gratificacion + bonificacion + comision + promedio_horas_trabajo_extra
+        if contrato.regimen_laboral_empresa == 'pequenhaempresa':
+                rem_computable = rem_computable/2.0
         monto_x_mes = round(rem_computable/12.0, 2)
         monto_x_dia = round(monto_x_mes/30.0, 2)
         monto_x_meses = round(monto_x_mes*meses, 2)
@@ -1258,24 +1348,20 @@ class PlanillaLiquidacion(models.Model):
         otros_dtos = 0.0
         cts_a_pagar = (cts_soles+cts_interes)-otros_dtos
 
-        if  contrato.employee_id.tipo_empresa=='microempresa':
-            cts_a_pagar=0
-        elif contrato.employee_id.tipo_empresa=='pequenhaempresa':
-            cts_a_pagar/=2.0
-
         tipo_cambio_venta = self.tipo_cambio
-        cts_dolares = round(cts_a_pagar*tipo_cambio_venta, 2)
-        cuenta_cts = 0.0
-        banco = 0.0
+        cts_dolares = round(cts_a_pagar/tipo_cambio_venta, 2)
+        cuenta_cts = contrato.employee_id.bacts_acc_number_rel
+        banco = contrato.employee_id.bacts_bank_id_rel.id
 
         vals = {
             'planilla_liquidacion_id': self.id,
-            'employee_id': contrato.employee_id,
+            'orden':e,
+            'employee_id': contrato.employee_id.id,
             'contract_id': contrato.id,
             'identification_number': contrato.employee_id.identification_id,
             'last_name_father': contrato.employee_id.a_paterno,
             'last_name_mother': contrato.employee_id.a_materno,
-            'names': contrato.employee_id.name_related,
+            'names': contrato.employee_id.nombres,
             'fecha_ingreso': fecha_ini,
             'fecha_computable': fecha_computable,
             'fecha_cese': fecha_fin,
@@ -1308,11 +1394,20 @@ class PlanillaLiquidacion(models.Model):
         return True
 
     @api.multi
-    def calcular_vacaciones(self, contrato, date_start_liquidacion, date_end_liquidacion, fecha_ini, fecha_fin):
+    def calcular_vacaciones(self, contrato, date_start_liquidacion, date_end_liquidacion, fecha_ini, fecha_fin,e):
         self.ensure_one()
         helper_liquidacion = self.env['planilla.helpers']
         parametros_gratificacion = self.env['planilla.gratificacion'].get_parametros_gratificacion()
-        fecha_ini = date(int(self.year), fecha_ini.month, fecha_ini.day)
+        '''
+            se toma como base el año actual por ejm si su contrato inicia 2015-05-13
+            se tendria que cambiar a 2019-05-13 esto solo si el mes de la liquidacion
+            es mayor al mes en que se esta iniciando el contrato
+        '''
+        if self.month >= fecha_ini.month:
+            fecha_ini = date(int(self.year), fecha_ini.month, fecha_ini.day)
+        else:
+            fecha_ini = date(int(self.year)-1, fecha_ini.month, fecha_ini.day)
+
         fecha_computable = fecha_fin - relativedelta(months=+6)
 
         dias = 0
@@ -1354,19 +1449,31 @@ class PlanillaLiquidacion(models.Model):
                 fecha_fin.year, fecha_ini.month, fecha_ini.day)
         else:
             fecha_inicio_nominas = date(fecha_ini.year, fecha_ini.month, 1)
-            fecha_fin_nominas = fecha_fin - relativedelta(months=+1)
+            fecha_fin_nominas = fecha_fin - relativedelta(months=0)
             fecha_fin_nominas = date(fecha_fin_nominas.year, fecha_fin_nominas.month, calendar.monthrange(
                 fecha_fin_nominas.year, fecha_fin_nominas.month)[1])
 
-            conceptos = self.env['hr.payslip'].search([('date_from', '>=', fecha_inicio_nominas), (
-                'date_to', '<=', fecha_fin_nominas), ('employee_id', '=', contrato.employee_id.id)], order='date_to desc')
+            sql = """
+                select min(hp.id),sum(hwd.number_of_days) as days,min(hp.name) as name
+                from hr_payslip hp
+                inner join hr_contract hc on hc.id = hp.contract_id
+                inner join hr_payslip_worked_days hwd on hwd.payslip_id = hp.id
+                where hp.date_from >= '%s'
+                and hp.date_to <= '%s'
+                and hp.employee_id = %d
+                and hc.regimen_laboral_empresa not in ('practicante','microempresa')
+                and hwd.code in (%s)
+                group by hp.employee_id, hp.payslip_run_id
+            """%(fecha_inicio_nominas,fecha_fin_nominas,contrato.employee_id.id,
+                ','.join("'%s'"%(wd.codigo) for wd in parametros_gratificacion.cod_wds))
+            self.env.cr.execute(sql)
+            conceptos = self.env.cr.dictfetchall()
 
             verificar_meses, _ = helper_liquidacion.diferencia_meses_dias(
                 fecha_inicio_nominas, fecha_fin_nominas)
 
             if len(conceptos) != verificar_meses:
-                fecha_encontradas = ' '.join(
-                    ['\t-'+x.name+'\n' for x in conceptos])
+                fecha_encontradas = ' '.join(['\t-'+x['name']+'\n' for x in conceptos])
                 if not fecha_encontradas:
                     fecha_encontradas = '"No tiene nominas"'
                 raise UserError(
@@ -1374,23 +1481,32 @@ class PlanillaLiquidacion(models.Model):
                         contrato.employee_id.name_related, fecha_inicio_nominas, fecha_fin_nominas, fecha_encontradas, abs(len(
                             conceptos) - (verificar_meses))
                     ))
-
-            basico = helper_liquidacion.getBasicoByDate(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas, contrato.employee_id.id,parametros_gratificacion.cod_basico.code )  # conceptos[0].basico if conceptos else 0.0
-            faltas = helper_liquidacion.getSumFaltas(fecha_inicio_nominas,fecha_fin_nominas, contrato.employee_id.id,parametros_gratificacion.cod_dias_faltas.codigo ) #sum([x.dias_faltas for x in conceptos])
-
-
-
+            if contrato.hourly_worker:
+                payslips = self.env['hr.payslip'].search([('employee_id','=',contrato.employee_id.id),
+                                                            ('date_from','>=',rango_inicio_planilla),
+                                                            ('date_to','<=',rango_fin_planilla)])
+                for payslip in payslips:
+                    lines.append(next(iter(filter(lambda l:l.code == 'BAS',payslip.line_ids)),None))
+                basico = sum([line.amount for line in lines])/6.0
+            else:
+                basico = helper_liquidacion.getBasicoByDate(date(fecha_fin_nominas.year,fecha_fin_nominas.month,1),fecha_fin_nominas, contrato.employee_id.id,parametros_gratificacion.cod_basico.code,True)  # conceptos[0].basico if conceptos else 0.0
+            
+            if parametros_gratificacion.cod_dias_faltas:
+                faltas = helper_liquidacion.getSumFaltas(fecha_inicio_nominas,fecha_fin_nominas, contrato.employee_id.id,parametros_gratificacion.cod_dias_faltas.codigo ) #sum([x.dias_faltas for x in conceptos])
+            else:
+                faltas = 0
             helper_liquidacion = self.env['planilla.helpers']
             meses_comisiones = fecha_fin.month-fecha_computable.month
             comisiones_periodo, promedio_bonificaciones, promedio_horas_trabajo_extra = helper_liquidacion.calcula_comision_gratificacion_hrs_extras(
                 contrato, fecha_computable, fecha_fin_nominas, meses_comisiones, fecha_fin)
 
         bonificacion = promedio_bonificaciones
-        comision = comisiones_periodo
+        comision = comisiones_periodo        
+        afam = 93.0 if contrato.employee_id.children > 0 else 0.0
 
-        rem_computable = basico + \
-            bonificacion + comision + promedio_horas_trabajo_extra
-
+        rem_computable = basico + afam + bonificacion + comision + promedio_horas_trabajo_extra
+        if contrato.regimen_laboral_empresa == 'pequenhaempresa':
+                rem_computable = rem_computable/2.0
         monto_x_mes = round(rem_computable/12.0, 2)
         monto_x_dia = round(monto_x_mes/30.0, 2)
         monto_x_meses = round(monto_x_mes*meses, 2)
@@ -1405,32 +1521,32 @@ class PlanillaLiquidacion(models.Model):
             [('fecha_ini', '=', date_start_liquidacion), ('fecha_fin', '=', date_end_liquidacion)])
 
         query_afiliacion = """
-        select lower(pa.entidad) as entidad,fondo,segi,comf,comm from planilla_afiliacion_line pal
+        select lower(pa.entidad) as entidad,pa.fondo,segi,comf,comm from planilla_afiliacion_line pal
         inner join planilla_afiliacion pa
         on pa.id = pal.planilla_afiliacion_id
         where fecha_ini= '%s' and fecha_fin ='%s' and planilla_afiliacion_id=%d
         """ % (date_start_liquidacion, date_end_liquidacion, contrato.afiliacion_id)
 
         self.env.cr.execute(query_afiliacion)
-
         afiliacion = self.env.cr.dictfetchone()
         onp = 0
         afp_jub = 0
         afp_si = 0
         afp_com = 0
-        if afiliacion:
-            if afiliacion['entidad'] == 'onp':
-                onp = afiliacion['fondo']/100*total_vacaciones
-            else:
-                afp_jub = afiliacion['fondo']/100*total_vacaciones
-                afp_si = afiliacion['segi']/100*total_vacaciones
-                afp_com = afiliacion['comm']/100*total_vacaciones
 
-        neto_total = total_vacaciones + onp+afp_jub+afp_si+afp_com
+        if contrato.afiliacion_id.entidad.lower() == 'onp':
+            onp = contrato.afiliacion_id.fondo/100*total_vacaciones
+        else:
+            afp_jub = contrato.afiliacion_id.fondo/100*total_vacaciones
+            afp_si = contrato.afiliacion_id.prima_s/100*total_vacaciones
+            afp_com = contrato.afiliacion_id.com_mix/100*total_vacaciones
+
+        neto_total = total_vacaciones - (onp+afp_jub+afp_si+afp_com)
 
         vals = {
             'planilla_liquidacion_id': self.id,
-            'employee_id': contrato.employee_id,
+            'orden':e,
+            'employee_id': contrato.employee_id.id,
             'contract_id': contrato.id,
             'identification_number': contrato.employee_id.identification_id,
             'last_name_father': contrato.employee_id.a_paterno,
@@ -1441,6 +1557,7 @@ class PlanillaLiquidacion(models.Model):
             'fecha_cese': fecha_fin,
             'faltas': faltas,
             'basico': basico,
+            'afam': afam,
             'comision': comision,
             'bonificacion': bonificacion,
             'horas_extras_mean': promedio_horas_trabajo_extra,
@@ -1460,4 +1577,19 @@ class PlanillaLiquidacion(models.Model):
         }
 
         self.planilla_vacaciones_lines.create(vals)
+        vals = {
+            'planilla_liquidacion_id': self.id,
+            'orden':e,
+            'employee_id': contrato.employee_id.id,
+            'contract_id': contrato.id,
+            'identification_number': contrato.employee_id.identification_id,
+            'last_name_father': contrato.employee_id.a_paterno,
+            'last_name_mother': contrato.employee_id.a_materno,
+            'names': contrato.employee_id.nombres,
+            'fecha_ingreso': fecha_ini,
+            'fecha_cese': fecha_fin
+        }
+        self.planilla_indemnizacion_lines.create(vals)
+
+
         return True

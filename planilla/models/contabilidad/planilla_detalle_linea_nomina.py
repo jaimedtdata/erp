@@ -73,7 +73,6 @@ class PlanillaDetalleLineaNominaWizard(models.TransientModel):
                         ) T
                 )""" % (self.date_start_rel,self.date_end_rel)
 
-        print query_vista
         self.env.cr.execute(query_vista)
 
         return {

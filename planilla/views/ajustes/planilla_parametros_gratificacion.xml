@@ -8,8 +8,8 @@
                 <group string="Parametros de Gratificacion">
                     <group>
                         <field name="cod_gratificacion" />
-                        <field name="cod_bonificaciones" />
-                        <field name="cod_comisiones" />
+                        <field name="cod_bonificaciones" widget="many2many_tags"/>
+                        <field name="cod_comisiones" widget="many2many_tags"/>
                         <field name="cod_sobretiempos" />
                     </group>
                     <group>
@@ -18,6 +18,9 @@
                         <field name="cod_bonificacion_9" />
                         <field name="cod_dias_faltas" />
                     </group>
+                </group>
+                <group>
+                    <field name="cod_wds" widget="many2many_tags"/>
                 </group>
             </form>
         </field>

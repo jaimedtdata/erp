@@ -17,6 +17,7 @@
                     <group>
                         <field name="year" required="1"/>
                         <field name="plus_9"/>
+                        <field name="calcular_meses_dias" />
                     </group>
                     <group>
                         <field name="tipo"/>
@@ -57,13 +58,14 @@
         <field name="model">planilla.gratificacion.line</field>
         <field name="arch" type="xml">
             <tree create="0" delete="0">
-                <field name="id" string="Orden"/>
+                <field name="orden" string="Orden"/>
                 <field name="identification_number"/>
                 <field name="last_name_father"/>
                 <field name="last_name_mother"/>
                 <field name="names"/>
                 <field name="fecha_ingreso"/>
                 <field name="meses"/>
+                <field name="dias"/>
                 <field name="faltas"/>
                 <field name="basico" sum="basico"/>
                 <field name="a_familiar" sum="a_familiar"/>

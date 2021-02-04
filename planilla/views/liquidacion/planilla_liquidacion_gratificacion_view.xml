@@ -5,7 +5,7 @@
         <field name="model">planilla.liquidacion.gratificacion.line</field>
         <field name="arch" type="xml">
             <tree create="0" delete="0">
-                <field name="id" string="Orden"/>
+                <field name="orden" string="Orden"/>
                 <field name="identification_number"/>
                 <field name="last_name_father"/>
                 <field name="last_name_mother"/>

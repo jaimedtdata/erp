@@ -12,8 +12,9 @@ class PlanillaAfiliacion(models.Model):
     com_fija= fields.Float("Comision Fija")
     com_mix= fields.Float("Comision Mixta")
     prima_s= fields.Float("Prima Seguro")
-    fondo_jib= fields.Float("Fondo de Jubilacion")
+    fondo= fields.Float("Fondo de Jubilacion")
     rem_ase= fields.Float("Remuneracion Asegurable")
+    account_id = fields.Many2one('account.account','Cuenta Contable')
 
 
 

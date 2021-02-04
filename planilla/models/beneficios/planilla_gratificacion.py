@@ -10,10 +10,15 @@ import io
 from xlsxwriter.workbook import Workbook
 import base64
 
-
 class PlanillaGratificacion(models.Model):
     _name = "planilla.gratificacion"
-    _rec_name = 'year'
+
+    @api.depends('year','tipo')
+    def _get_name(self):
+        for gra in self:
+            gra.name = u"%s - %s"%(dict(gra._fields['tipo'].selection).get(gra.tipo),dict(gra._fields['year'].selection).get(gra.year))
+
+    name = fields.Char(compute="_get_name")
 
     year = fields.Selection([
         ('2017', '2017'),
@@ -39,31 +44,38 @@ class PlanillaGratificacion(models.Model):
     date_end = fields.Date()
 
     plus_9 = fields.Boolean("Considerar Bono 9%")
+    calcular_meses_dias = fields.Boolean("calcular meses y dias")
     planilla_gratificacion_lines = fields.One2many(
         'planilla.gratificacion.line', 'planilla_gratificacion_id', "Lineas")
 
     deposit_date = fields.Date(u'Fecha depósito')
 
     @api.multi
-    @api.depends('tipo','year')
-    @api.onchange('tipo','year')
+    @api.depends('tipo', 'year')
+    @api.onchange('tipo', 'year')
     def change_dates(self):
         self.ensure_one()
         if self.year:
             if self.tipo == '07':
-                self.date_start = date(int(self.year), 6, 1)
-                self.date_end = date(int(self.year), 6, 30)
+                self.date_start = date(int(self.year), 7, 1)
+                self.date_end = date(int(self.year), 7, 31)
             else:
                 self.date_start = date(int(self.year), 12, 1)
                 self.date_end = date(int(self.year), 12, 31)
 
     @api.multi
+    def unlink(self):
+        nomina = self.env['hr.payslip.run'].search([('date_start', '=', self.date_start), 
+                                                    ('date_end', '=', self.date_end)])
+        nomina.write({'grati_flag':False})
+        super(PlanillaGratificacion,self).unlink()
+
+    @api.multi
     def write(self, vals):
-        print "vals ", vals
         if vals and "tipo"in vals:
             if vals['tipo'] == '07':
-                vals['date_start'] = date(int(self.year), 6, 1)
-                vals['date_end'] = date(int(self.year), 6, 30)
+                vals['date_start'] = date(int(self.year), 7, 1)
+                vals['date_end'] = date(int(self.year), 7, 31)
             else:
                 vals['date_start'] = date(int(self.year), 12, 1)
                 vals['date_end'] = date(int(self.year), 12, 31)
@@ -71,15 +83,13 @@ class PlanillaGratificacion(models.Model):
 
     @api.model
     def create(self, vals):
-        print vals
         if len(self.search([('year', '=', vals['year']), ('tipo', '=', vals['tipo'])])) >= 1:
             raise UserError(
                 "Ya existe un registros %s %s" % (vals['year'], vals['tipo']))
         else:
-            print "MIS AÑOS ",self.year
             if vals['tipo'] == '07':
-                vals['date_start'] = date(int(vals['year']), 6, 1)
-                vals['date_end'] = date(int(vals['year']), 6, 30)
+                vals['date_start'] = date(int(vals['year']), 7, 1)
+                vals['date_end'] = date(int(vals['year']), 7, 31)
             else:
                 vals['date_start'] = date(int(vals['year']), 12, 1)
                 vals['date_end'] = date(int(vals['year']), 12, 31)
@@ -90,19 +100,11 @@ class PlanillaGratificacion(models.Model):
 
         parametros_gratificacion = self.env['planilla.parametros.gratificacion'].search([
         ], limit=1)
-        # if not parametros_gratificacion.cod_he25.codigo:
-        #     raise UserError(
-        #         'Debe configurar parametros de gratificacion cod_he25 Nomina->configuracion->parametros gratificacion')
-        # elif not parametros_gratificacion.cod_he35.codigo:
-        #     raise UserError(
-        #         'Debe configurar parametros de gratificacion cod_he35 Nomina->configuracion->parametros gratificacion')
-        # elif not parametros_gratificacion.cod_he100.codigo:
-        # raise UserError(
-        # 'Debe configurar parametros de gratificacion cod_he100 Nomina->configuracion->parametros gratificacion')
+
         if not parametros_gratificacion.cod_gratificacion.codigo:
             raise UserError(
                 'Debe configurar parametros de gratificacion cod_gratificacion Nomina->configuracion->parametros gratificacion')
-        elif not parametros_gratificacion.cod_bonificaciones.code:
+        elif not parametros_gratificacion.cod_bonificaciones:
             raise UserError(
                 'Debe configurar parametros de gratificacion cod_bonificaciones Nomina->configuracion->parametros gratificacion')
         elif not parametros_gratificacion.cod_basico.code:
@@ -114,31 +116,25 @@ class PlanillaGratificacion(models.Model):
         elif not parametros_gratificacion.cod_bonificacion_9.code:
             raise UserError(
                 'Debe configurar parametros de gratificacion cod_bonificacion_9 Nomina->configuracion->parametros gratificacion')
-        elif not parametros_gratificacion.cod_dias_faltas.codigo:
-            raise UserError(
-                'Debe configurar parametros de gratificacion cod_dias_faltas Nomina->configuracion->parametros gratificacion')
-        elif not parametros_gratificacion.cod_comisiones.code:
+        elif not parametros_gratificacion.cod_comisiones:
             raise UserError(
                 'Debe configurar parametros de gratificacion cod_comisiones Nomina->configuracion->parametros gratificacion')
         elif not parametros_gratificacion.cod_sobretiempos.code:
             raise UserError(
                 'Debe configurar parametros de gratificacion cod_sobretiempos Nomina->configuracion->parametros gratificacion')
+        elif not parametros_gratificacion.cod_wds:
+            raise UserError('Debe configurar parametros de gratificacion wd_concepts Nomina->Configuracion->Parametros Gratificacion')
         else:
             return parametros_gratificacion
 
     @api.multi
     def calcular_gratificacion(self):
-        print "========0CALCULANDO GRATIFICACION =================="
         self.ensure_one()
         helper_liquidacion = self.env['planilla.helpers']
         self.planilla_gratificacion_lines.unlink()
         tabla_montos_primera_mitad = False
         parametros_gratificacion = self.get_parametros_gratificacion()
-        parametros_eps = self.env['planilla.parametros.essalud.eps'].get_parametros_essalud_eps(
-        )
 
-        # print parametros_gratificacion.cod_he100.codigo
-        # import pudb;pudb.set_trace()
         if self.tipo == '07':
             # el rango fin deberia ser 30 del mes 6
             # pero para asegurarme que al menos haya
@@ -157,55 +153,66 @@ class PlanillaGratificacion(models.Model):
         else:
             rango_inicio_contrato = date(int(self.year), 11, 1)
             # rango_fin_contrato = date(int(self.year), 12, 31) #30 nov
-            rango_fin_contrato = date(int(self.year), 11, 30)  # 30 nov
+            rango_fin_contrato = date(int(self.year), 12, 31)  # 30 nov
             rango_inicio_planilla = date(int(self.year), 7, 1)
             # rango_fin_planilla = date(int(self.year), 12, 31)
-            rango_fin_planilla = date(int(self.year), 11, 30)
+            rango_fin_planilla = date(int(self.year), 12, 31)
 
         query_gratificacion = """
-        select T.tipo_empresa,T.id,T.employee_id,T.identification_id, T.a_paterno,T.a_materno,T.nombres,T.date_start,T.date_end,sum(faltas) as faltas,max(T.basico) as basico,max(T.afam) as afam,max(T.bo9) as bo9
-        from (
-        select hc.id,hc.employee_id, hc.date_start,hc.date_end,
-        he.identification_id,
-        he.tipo_empresa,
-        he.a_paterno,
-        he.a_materno,   
-        he.nombres,
-        (case when  hp.date_from>='%s' and hp.date_to<='%s'   then hp.basico else 0 end) as basico ,
-        (case when ( date_from>='%s' and date_to<='%s'  ) then hp.asignacion_familiar else 0 end) as afam,
-        (case when ( date_from>='%s' and date_to<='%s'  ) then hp.bonificacion_9 else 0 end) as bo9,
-        hp.dias_faltas  as faltas
-        from hr_payslip hp
-        inner join hr_contract hc
-        on hc.id = hp.contract_id
-        inner join hr_employee he
-        on he.id = hp.employee_id
-        where ( date_start <= '%s' ) and (date_end is null or date_end>'%s')
-        and( date_from>='%s' and date_to<='%s'  )
-        ) as T
-        group by T.id,T.employee_id,T.identification_id, T.a_paterno,T.a_materno,T.nombres,T.date_start,T.date_end,T.tipo_empresa
-        order by T.id
+        
+            select distinct 
+            max(hc.id) as id,
+            hc.employee_id,
+            min(hc.date_start) as date_start,
+            array_agg(hc.date_end) as date_end,
+            max(he.identification_id) as identification_id,
+            max(hc.regimen_laboral_empresa) as regimen_laboral_empresa,
+            max(he.a_paterno) as a_paterno,
+            max(he.a_materno) as a_materno,
+            max(he.nombres) as nombres,
+            sum((case when  hp.date_from>='%s' and hp.date_to<='%s'   then hp.basico else 0 end)) as basico ,
+            sum((case when ( date_from>='%s' and date_to<='%s'  ) then hp.asignacion_familiar else 0 end)) as afam,
+            sum((case when ( date_from>='%s' and date_to<='%s'  ) then hp.bonificacion_9 else 0 end)) as bo9,
+            sum(hp.dias_faltas) as faltas
+            from hr_payslip hp
+            inner join hr_contract hc on hc.id = hp.contract_id
+            inner join planilla_situacion ps on ps.id = hc.situacion_id
+            inner join hr_employee he on he.id = hp.employee_id
+            where (date_from>='%s' and date_to<='%s')
+            and ps.codigo = '1'
+            group by hc.employee_id
+            order by hc.employee_id
         """ % (rango_inicio_contrato, rango_fin_planilla,
                rango_inicio_contrato, rango_fin_planilla,
                rango_inicio_contrato, rango_fin_planilla,
-               rango_inicio_contrato, rango_fin_contrato,
                rango_inicio_planilla, rango_fin_planilla)
-
-        print query_gratificacion
+        #rango_inicio_contrato, rango_fin_contrato
         self.env.cr.execute(query_gratificacion)
 
-
         contratos = self.env.cr.dictfetchall()
+        array_filter = []
+        for contrato in contratos:
+            for date_contract in contrato['date_end']:
+                if date_contract == None:
+                    contrato['date_end'] = None
+            if contrato['date_end']:
+                contrato['date_end'] = max(contrato['date_end'])
+            if datetime.strptime(contrato['date_start'],'%Y-%m-%d').date() <= rango_inicio_contrato and (contrato['date_end'] == None or contrato['date_end'] >= rango_fin_contrato):
+                array_filter.append(contrato)
         # itero los rangos de fechas de cada resumen_periodo
         # el objetivo es encontrar el maximo rango de
         # fechas continuas
         fechas = list()
-        for i in range(len(contratos)):
-            resumen_periodo = contratos[i]
-            print "mi resumen_periodo actual ", resumen_periodo
+        for e,i in enumerate(range(len(array_filter)),1):
+            resumen_periodo = array_filter[i]
             contratos_empleado = self.env['hr.contract'].search(
-                [('employee_id', '=',  resumen_periodo['employee_id']), ('date_end', '<=', resumen_periodo['date_end'])], order='date_end desc')
-
+                [('employee_id', '=',  resumen_periodo['employee_id']),
+                ('regimen_laboral_empresa','not in',['practicante','microempresa']),
+                '|', 
+                ('date_end', '<=', resumen_periodo['date_end']), 
+                ('date_end', '=', False)], order='date_end desc')
+            if not contratos_empleado:
+                continue
             fecha_ini = fields.Date.from_string(
                 contratos_empleado[0].date_start)
             fecha_fin_contrato = fields.Date.from_string(
@@ -217,17 +224,8 @@ class PlanillaGratificacion(models.Model):
                 if abs(((fecha_fin)-(fecha_ini)).days) == 1:
                     fecha_ini = fields.Date.from_string(c_empleado.date_start)
             fecha_fin = fecha_fin_contrato
-            # datetime.combine(d, datetime.min.time()) fecha_ini#datetime(int(fecha_ini[:4]), int(fecha_ini[5:7]), int(fecha_ini[8:10]))
-
-            # if fecha_ini < rango_inicio_planilla:
-            #     meses = 6
-            # elif fecha_ini.day > 1:
-            #     # el mes que esta no cuenta por eso se deja como esta la resta
-            #     meses = helper_liquidacion.diferencia_meses_gratificacion(fecha_ini,rango_fin_planilla)
-            # else:
-            #     # mas un mes por que el mes que esta iniciando cuenta
-            meses = helper_liquidacion.diferencia_meses_gratificacion(
-                fecha_ini, rango_fin_planilla)
+            meses, dias = helper_liquidacion.diferencia_meses_dias(
+                rango_inicio_planilla, rango_fin_planilla)
 
             if fecha_ini < rango_inicio_planilla:
                 fecha_computable = rango_inicio_planilla
@@ -237,19 +235,29 @@ class PlanillaGratificacion(models.Model):
             fecha_inicio_nominas = date(
                 fecha_computable.year, fecha_computable.month, 1)
 
-            conceptos = self.env['hr.payslip'].search([('date_from', '>=', fecha_inicio_nominas), (
-                'date_to', '<=', rango_fin_planilla), ('employee_id', '=', resumen_periodo['employee_id'])], order='date_to desc')
-
+            sql = """
+                select min(hp.id),sum(hwd.number_of_days) as days,min(hp.name) as name
+                from hr_payslip hp
+                inner join hr_contract hc on hc.id = hp.contract_id
+                inner join hr_payslip_worked_days hwd on hwd.payslip_id = hp.id
+                where hp.date_from >= '%s'
+                and hp.date_to <= '%s'
+                and hp.employee_id = %d
+                and hc.regimen_laboral_empresa not in ('practicante','microempresa')
+                and hwd.code in (%s)
+                group by hp.employee_id, hp.payslip_run_id
+            """%(fecha_inicio_nominas,
+                rango_fin_planilla,
+                resumen_periodo['employee_id'],
+                ','.join("'%s'"%(wd.codigo) for wd in parametros_gratificacion.cod_wds))
+            self.env.cr.execute(sql)
+            conceptos = self.env.cr.dictfetchall()
+            if not conceptos:
+                continue
             verificar_meses, _ = helper_liquidacion.diferencia_meses_dias(
                 fecha_inicio_nominas, rango_fin_planilla)
-            print "VERIFICAR MESES ", verificar_meses
-
-            # if dias==0:
-            #     verificar_meses-=1
-
             if len(conceptos) != verificar_meses:
-                fecha_encontradas = ' '.join(
-                    ['\t-'+x.name+'\n' for x in conceptos])
+                fecha_encontradas = ' '.join(['\t-'+x['name']+'\n' for x in conceptos])
                 if not fecha_encontradas:
                     fecha_encontradas = '"No tiene nominas"'
                 raise UserError(
@@ -258,9 +266,36 @@ class PlanillaGratificacion(models.Model):
                             conceptos) - (verificar_meses))
                     ))
 
-            basico = helper_liquidacion.getBasicoByDate(date(rango_fin_planilla.year, rango_fin_planilla.month, 1),rango_fin_planilla,resumen_periodo['employee_id'],parametros_gratificacion.cod_basico.code )  # conceptos[0].basico if conceptos else 0.0
-            faltas = helper_liquidacion.getSumFaltas(date(rango_fin_planilla.year, rango_fin_planilla.month, 1),rango_fin_planilla,resumen_periodo['employee_id'],parametros_gratificacion.cod_dias_faltas.codigo ) #sum([x.dias_faltas for x in conceptos])
-            afam = helper_liquidacion.getAsignacionFamiliarByDate(fecha_inicio_nominas,rango_fin_planilla,resumen_periodo['employee_id'],parametros_gratificacion.cod_asignacion_familiar.code )  #conceptos[0].asignacion_familiar if conceptos else 0.0
+            days = months = 0
+            for concepto in conceptos:
+                days += concepto['days']
+                while days >= 30:
+                    days -= 30
+                    months += 1
+
+            meses = months
+            dias = days if self.calcular_meses_dias else 0
+            
+            lines = []
+            contract_obj = self.env['hr.contract'].browse(resumen_periodo['id'])
+            if contract_obj.hourly_worker:
+                payslips = self.env['hr.payslip'].search([('employee_id','=',contract_obj.employee_id.id),
+                                                            ('date_from','>=',rango_inicio_planilla),
+                                                            ('date_to','<=',rango_fin_planilla)])
+                for payslip in payslips:
+                    lines.append(next(iter(filter(lambda l:l.code == 'BAS',payslip.line_ids)),None))
+                basico = sum([line.amount for line in lines])/6.0
+            else:
+                basico = helper_liquidacion.getBasicoByDate(date(rango_fin_planilla.year, rango_fin_planilla.month, 1), rango_fin_planilla,
+                                                            resumen_periodo['employee_id'], parametros_gratificacion.cod_basico.code)  # conceptos[0].basico if conceptos else 0.0
+            # sum([x.dias_faltas for x in conceptos])
+            if parametros_gratificacion.cod_dias_faltas:
+                faltas = helper_liquidacion.getSumFaltas(
+                    fecha_inicio_nominas, rango_fin_planilla, resumen_periodo['employee_id'], parametros_gratificacion.cod_dias_faltas.codigo)
+            else:
+                faltas = 0
+            afam = helper_liquidacion.getAsignacionFamiliarByDate(date(rango_fin_planilla.year, rango_fin_planilla.month, 1), rango_fin_planilla,
+                                                                  resumen_periodo['employee_id'], parametros_gratificacion.cod_asignacion_familiar.code)  # conceptos[0].asignacion_familiar if conceptos else 0.0
 
             comisiones_periodo, promedio_bonificaciones, promedio_horas_trabajo_extra = helper_liquidacion.calcula_comision_gratificacion_hrs_extras(
                 contratos_empleado[0], fecha_computable, rango_fin_planilla, meses, rango_fin_planilla)
@@ -268,41 +303,24 @@ class PlanillaGratificacion(models.Model):
             bonificacion_9 = 0
             bonificacion = promedio_bonificaciones
             comision = comisiones_periodo
-            dias = 0
-            # faltas = float(resumen_periodo['faltas']
-            #                ) if resumen_periodo['faltas'] else 0.0
-
-            rem_computable = basico + \
-                bonificacion+comision + \
-                afam+promedio_horas_trabajo_extra
+            rem_computable = basico + bonificacion + comision + afam + promedio_horas_trabajo_extra
+            if contract_obj.regimen_laboral_empresa == 'pequenhaempresa':
+                rem_computable = rem_computable/2.0
             monto_x_mes = round(rem_computable/6.0, 2)
             monto_x_dia = round(monto_x_mes/30.0, 2)
-            monto_x_meses = round(
-                monto_x_mes*meses, 2) if meses != 6 else rem_computable
+            monto_x_meses = round(monto_x_mes*meses, 2) if meses != 6 else rem_computable
             monto_x_dias = round(monto_x_dia*dias, 2)
             total_faltas = round(monto_x_dia*faltas, 2)
             total_gratificacion = (monto_x_meses+monto_x_dias)-total_faltas
 
-            if  resumen_periodo['tipo_empresa']=='microempresa':
-                total_gratificacion=0
-            elif resumen_periodo['tipo_empresa']=='pequenhaempresa':
-                total_gratificacion/=2.0
-
-            
-
-            print "mi resumen_periodo ", resumen_periodo
-            print "mi plus9 ",  self.plus_9
             if self.plus_9:
-                print contratos_empleado[0].tipo_seguro 
-                if contratos_empleado[0].tipo_seguro == 'essalud':
-                    bonificacion_9 = parametros_eps.ratio_essalud / \
-                        100.0*float(total_gratificacion)
-                else:
-                    bonificacion_9 = parametros_eps.ratio_eps / \
+                if contratos_empleado[0].seguro_salud_id:
+                    bonificacion_9 = contratos_empleado[0].seguro_salud_id.porcentaje / \
                         100.0*float(total_gratificacion)
 
             vals = {
                 'planilla_gratificacion_id': self.id,
+                'orden':e,
                 'employee_id': resumen_periodo['employee_id'],
                 'identification_number': resumen_periodo['identification_id'],
                 'last_name_father': resumen_periodo['a_paterno'],
@@ -310,6 +328,7 @@ class PlanillaGratificacion(models.Model):
                 'names': resumen_periodo['nombres'],
                 'fecha_ingreso': fecha_ini,
                 'meses': meses,
+                'dias': dias,
                 'faltas': faltas,
                 'basico': basico,
                 'a_familiar': afam,
@@ -326,18 +345,13 @@ class PlanillaGratificacion(models.Model):
                 'plus_9': bonificacion_9,
                 'total': total_gratificacion+bonificacion_9
             }
-            print "datos finales para ", resumen_periodo['nombres']
-            print "datos finales para ", vals
+
             self.planilla_gratificacion_lines.create(vals)
-        return True
+        nomina = self.env['hr.payslip.run'].search([('date_start', '=', self.date_start), 
+                                                    ('date_end', '=', self.date_end)])
+        nomina.write({'grati_flag':True})
 
-        # abs(datetime(2017,2,1).month-datetime(2017,6,30).month)
-
-        # # return date(self._default_fecha_fin().year, 1, 1)
-        # todayDate = date.today()
-        # # if todayDate.day > 25:
-        # #     todayDate += timedelta(7)
-        # return todayDate.replace(day=1)
+        return self.env['planilla.warning'].info(title='Resultado de importacion', message="SE CALCULO GRATIFICACION DE MANERA EXITOSA!")
 
     @api.multi
     def get_excel(self):
@@ -346,28 +360,27 @@ class PlanillaGratificacion(models.Model):
         sys.setdefaultencoding('iso-8859-1')
         output = io.BytesIO()
 
-        # direccion = self.env['main.parameter'].search([])[0].dir_create_file
-        workbook = Workbook('CTS%s-%s.xlsx' % (self.year, self.tipo))
+        try:
+            direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
+        except: 
+            raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
+        workbook = Workbook(direccion+'GRATIFICACION%s-%s.xlsx' % (self.year, self.tipo))
         worksheet = workbook.add_worksheet(
-            'CTS%s-%s.xlsx' % (self.year, self.tipo))
+            'GRATIFICACION%s-%s.xlsx' % (self.year, self.tipo))
         lines = self.env['planilla.gratificacion.line'].search(
             [('planilla_gratificacion_id', "=", self.id)])
-        self.getSheetGratificacion(workbook,worksheet,lines)
-        
+        self.getSheetGratificacion(workbook, worksheet, lines,False)
+
         workbook.close()
 
-        f = open('CTS%s-%s.xlsx' % (self.year, self.tipo), 'rb')
+        f = open(direccion+'GRATIFICACION%s-%s.xlsx' % (self.year, self.tipo), 'rb')
 
         vals = {
-            'output_name': 'CTS%s-%s.xlsx' % (self.year, dict(self._fields['tipo'].selection).get(self.tipo)),
+            'output_name': 'GRATIFICACION%s-%s.xlsx' % (self.year, dict(self._fields['tipo'].selection).get(self.tipo)),
             'output_file': base64.encodestring(''.join(f.readlines())),
         }
 
         sfs_id = self.env['planilla.export.file'].create(vals)
-
-        # mod_obj = self.env['ir.model.data']
-        # act_obj = self.env['ir.actions.act_window']
-        # sfs_id = self.env['export.file.save'].create(vals)
 
         return {
             "type": "ir.actions.act_window",
@@ -378,7 +391,7 @@ class PlanillaGratificacion(models.Model):
         }
 
     @api.multi
-    def getSheetGratificacion(self,workbook,worksheet,lines):
+    def getSheetGratificacion(self, workbook, worksheet, lines,year):
                 # ----------------Formatos------------------
         basic = {
             'align'		: 'left',
@@ -424,12 +437,12 @@ class PlanillaGratificacion(models.Model):
         # ----------------------------------------------Título--------------------------------------------------
         rc = self.env['res.company'].search([])[0]
         cabecera = rc.name
-        worksheet.merge_range('A1:B1', cabecera, title_format)
+        worksheet.merge_range('A1:B1', cabecera.strip(), title_format)
         # ---------------------------------------------Cabecera------------------------------------------------
-        worksheet.merge_range('A2:D2', "CTS", bold_format)
+        worksheet.merge_range('A2:D2', U"GRATIFICACIÓN", bold_format)
         worksheet.write('A3', u"Año :", bold_format)
 
-        worksheet.write('B3', self.year, bold_format)
+        worksheet.write('B3', self.year if self.year != False else year, bold_format)
 
         columnas = ["Orden",
                     "Nro Documento",
@@ -438,6 +451,7 @@ class PlanillaGratificacion(models.Model):
                     "Nombres",
                     "Fecha\nIngreso",
                     "Meses",
+                    "Dias",
                     "Faltas",
                     u"Básico",
                     "A.\nFamiliar",
@@ -461,11 +475,11 @@ class PlanillaGratificacion(models.Model):
         # ------------------------------------------Insertando Data----------------------------------------------
         fil = 5
 
-        totals = [0]*14
+        totals = [0]*15
 
         for line in lines:
             col = 0
-            worksheet.write(fil, col, line.id, basic_format)
+            worksheet.write(fil, col, line.orden, basic_format)
             col += 1
             worksheet.write(fil, col, line.identification_number, basic_format)
             col += 1
@@ -478,6 +492,8 @@ class PlanillaGratificacion(models.Model):
             worksheet.write(fil, col, line.fecha_ingreso, basic_center_format)
             col += 1
             worksheet.write(fil, col, line.meses, basic_center_format)
+            col += 1
+            worksheet.write(fil, col, line.dias, basic_center_format)
             col += 1
             worksheet.write(fil, col, line.faltas, basic_center_format)
             col += 1
@@ -541,16 +557,15 @@ class PlanillaGratificacionLine(models.Model):
 
     planilla_gratificacion_id = fields.Many2one(
         'planilla.gratificacion', "Planilla Gratificacion")
-    # fields.Many2one('hr.employee', "Empleado")
-    employee_id = fields.Integer(index=True)
-    # order = fields.Integer("Orden", compute='get_order')
+    employee_id = fields.Many2one(
+        'hr.employee', "Empleado")
     identification_number = fields.Char("Nro Documento", size=9)
-    # code = fields.Char("Código", size=4)
     last_name_father = fields.Char("Apellido Paterno")
     last_name_mother = fields.Char("Apellido Materno")
     names = fields.Char("Nombres")
     fecha_ingreso = fields.Date("Fecha Ingreso")
     meses = fields.Integer("Meses")
+    dias = fields.Integer("Dias")
     faltas = fields.Integer("Faltas")
     basico = fields.Float(u"Básico", digits=(10, 2))
     a_familiar = fields.Float("A. Familiar", digits=(10, 2))
@@ -568,3 +583,4 @@ class PlanillaGratificacionLine(models.Model):
     # adelanto = fields.Float(u'Adelanto', digits=(10, 2))
     # total_to_pay = fields.Float(u'Gratificación a pagar', digits=(10, 2))
     total = fields.Float(u"Total Pagar", digits=(10, 2))
+    orden = fields.Integer('Orden')

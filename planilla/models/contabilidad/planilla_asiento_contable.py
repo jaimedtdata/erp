@@ -3,7 +3,7 @@ from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 from odoo.addons.base.res.res_request import referenceable_models
 from datetime import datetime
-import decimal
+from decimal import *
 from odoo.exceptions import UserError
 
 
@@ -25,7 +25,6 @@ class PlanillaAsientoContable(models.TransientModel):
             [('id', '=', self.env.context['current_id'])])
 
         account_move_lines = self.env.context['account_move_lines']
-
         n_vals = {
             'journal_id': self.diario.id,
             'date': payslip_run.date_end,
@@ -36,27 +35,55 @@ class PlanillaAsientoContable(models.TransientModel):
         
         for account_move_line in account_move_lines:
             if account_move_line['debe'] > 0:
-                query = """
-                insert into account_move_line(move_id,account_id,analytic_account_id,debit,credit,name,date_maturity,company_id,date)
-                values(%d,%d,%d,%f,%f,'%s','%s',1,'%s')
-                """ % (account_move_id.id, account_move_line['cuenta_debe'],
-                       account_move_line['cuenta_analitica_id'],
-                       float(account_move_line['debe']),
-                       0.0,
-                       account_move_line['concepto'],
-                       payslip_run.date_end,
-                       payslip_run.date_end)
+                if account_move_line['partner_id'] == 0:
+                    query = """
+                    insert into account_move_line(move_id,account_id,analytic_account_id,debit,credit,name,date_maturity,company_id,date)
+                    values(%d,%d,%d,%f,%f,'%s','%s',1,'%s')
+                    """ % (account_move_id.id, account_move_line['cuenta_debe'],
+                           account_move_line['cuenta_analitica_id'],
+                           float(account_move_line['debe']),
+                           0.0,
+                           account_move_line['concepto'],
+                           payslip_run.date_end,
+                           payslip_run.date_end)
+                else:
+                    query = """
+                    insert into account_move_line(move_id,account_id,analytic_account_id,debit,credit,name,date_maturity,company_id,date,partner_id,nro_comprobante)
+                    values(%d,%d,%d,%f,%f,'%s','%s',1,'%s',%d,'%s')
+                    """ % (account_move_id.id, account_move_line['cuenta_debe'],
+                           account_move_line['cuenta_analitica_id'],
+                           float(account_move_line['debe']),
+                           0.0,
+                           account_move_line['concepto'],
+                           payslip_run.date_end,
+                           payslip_run.date_end,
+                           account_move_line['partner_id'],
+                           account_move_line['nro_documento'] if account_move_line['nro_documento'] else '')
             else:
-                query = """
-                insert into account_move_line(move_id,account_id,debit,credit,name,date_maturity,company_id,date)
-                values(%d,%d,%f,%f,'%s','%s',1,'%s')
-                """ % (account_move_id.id,
-                       account_move_line['cuenta_debe'],
-                       0.0,
-                       float(account_move_line['haber']),
-                       account_move_line['concepto'],
-                       payslip_run.date_end,
-                       payslip_run.date_end)
+                if account_move_line['partner_id'] == 0:
+                    query = """
+                    insert into account_move_line(move_id,account_id,debit,credit,name,date_maturity,company_id,date)
+                    values(%d,%d,%f,%f,'%s','%s',1,'%s')
+                    """ % (account_move_id.id,
+                           account_move_line['cuenta_debe'],
+                           0.0,
+                           float(account_move_line['haber']),
+                           account_move_line['concepto'],
+                           payslip_run.date_end,
+                           payslip_run.date_end)
+                else:
+                    query = """
+                    insert into account_move_line(move_id,account_id,debit,credit,name,date_maturity,company_id,date,partner_id,nro_comprobante)
+                    values(%d,%d,%f,%f,'%s','%s',1,'%s',%d,'%s')
+                    """ % (account_move_id.id,
+                           account_move_line['cuenta_debe'],
+                           0.0,
+                           float(account_move_line['haber']),
+                           account_move_line['concepto'],
+                           payslip_run.date_end,
+                           payslip_run.date_end,
+                           account_move_line['partner_id'],
+                           account_move_line['nro_documento'] if account_move_line['nro_documento'] else '')
             self.env.cr.execute(query)
         if self.diferencia > 0:
             if not self.cuenta_ajuste.id:
@@ -85,5 +112,9 @@ class PlanillaAsientoContable(models.TransientModel):
             }
             n_aml = self.env['account.move.line'].create(nl_vals)
         payslip_run.state='generado'
-        payslip_run.asiento_contable_id =self.env['account.move'].browse(account_move_id).id
+        am = self.env['account.move'].browse(account_move_id).id
+        total = float(Decimal(str(sum([line.debit for line in am.line_ids]))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+        print(total)
+        am.write({'amount':total})
+        payslip_run.asiento_contable_id = am.id
 

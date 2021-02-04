@@ -23,7 +23,6 @@ class warning(models.TransientModel):
     def message(self,id,context):
         message = self.browse(id)
         message_type = [t[1]for t in WARNING_TYPES if message.id.my_type == t[0] ][0]
-        # print '%s: %s' % (_(message_type), _(message.title))
         res = {
             'name': '%s: %s' % (_(message_type), _(message.id.title)),
             'view_type': 'form',

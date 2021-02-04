@@ -128,7 +128,7 @@
 
 
     <!-- REGLAS SALARIALES PERUANAS -->
-    <data noupdate="0">
+    <data noupdate="1">
         <record id="hr_rule_BAS" model="hr.salary.rule">
             <field name="name">BASICO</field>
             <field name="sequence" eval="1"/>

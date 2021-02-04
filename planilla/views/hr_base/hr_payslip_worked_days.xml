@@ -11,8 +11,8 @@
                         <field name="name"/>
                         <field name="code"/>
                         <field name="number_of_days" sum="Total Working Days"/>
-                        <field name="number_of_hours"/>
-                        <field name="minutos"/>
+                        <field name="number_of_hours" widget="float_time"/>
+                        <field name="minutos" widget="float_time"/>
                         <field name="tasa"/>
                         <field name="contract_id"/>
                         <field name="sequence" invisible="True"/>

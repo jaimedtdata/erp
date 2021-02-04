@@ -3,7 +3,7 @@ from odoo import api, fields, models, tools, _
 import logging
 _logger = logging.getLogger(__name__)
 from odoo.exceptions import ValidationError
-
+from datetime import datetime
 
 class hr_contract(models.Model):
 
@@ -21,22 +21,21 @@ class hr_contract(models.Model):
         string=u'Tipo de Comision',
         selection=[(1, 'Flujo'), (2, 'Mixta')]
     )
-
-    situacion_id = fields.Many2one(
-        'planilla.situacion', string="Situacion", required=True)
+    suspension_laboral = fields.One2many('hr.labor.suspension','suspension_id')
+    situacion_id = fields.Many2one('planilla.situacion', string="Situacion", required=True)
+    hourly_worker = fields.Boolean(string="Trabajador por Horas",default=False)
     tipo_trabajador_id = fields.Many2one(
         'planilla.tipo.trabajador', string="Tipo trabajador", required=True)
 
-    tipo_suspension_id = fields.Many2one(
-        'planilla.tipo.suspension', string="Tipo suspension")
-    motivo = fields.Char("Motivo")
-    nro_dias = fields.Char("N° dias")
     otros_5ta_categoria = fields.Char(
         "Otros empleadores por Rentas de 5ta categorías")
 
+    remuneracion_mensual_proyectada = fields.Float(u'Remuneración Mensual Afecta Proyectada')
+    gratificacion_fiesta_patria_proyectada = fields.Float(u'Gratificación por Fiestas Patrias Proyectada')
+    gratificacion_navidad_proyectada = fields.Float(u'Gratificación por Navidad Proyectada')
+
     regimen_laboral = fields.Selection(
         string=u'Régimen Laboral',
-        index=True,
         selection=[
             ('N', 'N'),
             ('C', 'C'),
@@ -51,10 +50,16 @@ class hr_contract(models.Model):
         """,
         default='N'
     )
+    regimen_laboral_empresa = fields.Selection([
+        ('regimengeneral', 'Regimen General'),
+        ('pequenhaempresa', u'Pequeña empresa'),
+        ('microempresa', 'Micro empresa'),
+        ('practicante','Practicante')
+    ], string='Regimen Laboral Empresa', help="Tipo de empresa",default="regimengeneral",required=True)
+
 
     excepcion_aportador = fields.Selection(
         string=u'Excepcion Aportador',
-        index=True,
         selection=[
             ('L', 'L'),
             ('U', 'U'),
@@ -71,19 +76,51 @@ class hr_contract(models.Model):
              O - No corresponde aportar debido a otro motivo , no hubo remuneracion en el mes
         """
     )
+# deprecado 09/11/2018
+    # tipo_seguro = fields.Selection(
+    #     string=u'Tipo Seguro',
+    #     selection=[
+    #         ('essalud', 'EsSalud'),
+    #         ('eps', 'EPS'),
+    #     ],
+    #     help="""
+    #     """,
+    #     default='essalud',
+    #     required=True
+    # )
+    seguro_salud_id = fields.Many2one('planilla.seguro.salud', 'Seguro de salud',ondelete='set null')
+    fecha_record = fields.Date()
+    jornada = fields.Selection([
+        ('one','1 dia a la semana'),
+        ('two','2 dias a la semana'),
+        ('three','3 dias a la semana'),
+        ('four','4 dias a la semana'),
+        ('five','5 dias a la semana'),
+        ('six','6 dias a la semana'),
+        ],'Jornada Laboral',default='six')
+    sctr = fields.Many2one('planilla.sctr','SCTR')
 
-    tipo_seguro = fields.Selection(
-        string=u'Tipo Seguro',
-        index=True,
-        selection=[
-            ('essalud', 'EsSalud'),
-            ('eps', 'EPS'),
-        ],
-        help="""
-        """,
-        default='essalud',
-        required=True
-    )
+    def get_first_contract(self, employee, last_contract=False):
+        domain = [('employee_id', '=', employee.id), ('date_start', '<=', last_contract.date_start)] if last_contract else [('employee_id', '=', employee.id)]
+        Contracts = self.search(domain, order='date_start desc')
+        aux, roll_back = None, None
+        delimiter = len(Contracts)
+        if delimiter > 1:
+            for c, Contract in enumerate(Contracts):
+                if Contract.situacion_id.codigo == '0' and c == 0:
+                    aux = [Contract, c]
+                    continue
+                if Contract.situacion_id.codigo == '0' and aux and c - aux[1] == 1:
+                    return aux[0]
+                if Contract.situacion_id.codigo == '0' and aux and not c - aux[1] == 1:
+                    return roll_back
+                if Contract.situacion_id.codigo == '0' and not aux:
+                    return roll_back
+                if Contract.situacion_id.codigo != '0' and delimiter - 1 == c:
+                    return Contract
+                roll_back = Contract
+        else:
+            return Contracts
 
     @api.model
     def exist_contract(self, employee, date_from, date_to):
@@ -121,47 +158,64 @@ class hr_contract(models.Model):
 
     @api.multi
     def write(self, vals):
-        date_start = vals['date_start'] if 'date_start' in vals else self.date_start
-        date_end = vals['date_end'] if 'date_end' in vals else self.date_end
-        employee_id = vals['employee_id'] if 'employee_id' in vals else self.employee_id.id
+        if 'flag' not in vals:
+            date_start = vals['date_start'] if 'date_start' in vals else self.date_start
+            date_end = vals['date_end'] if 'date_end' in vals else self.date_end
+            employee_id = vals['employee_id'] if 'employee_id' in vals else self.employee_id.id
 
-        if not date_end:
+            num_row = self.search([('employee_id','=',employee_id), ('id', '!=', self.id),('state','=','draft')])
+
+            if len(num_row)>0:
+                raise ValidationError('Ya existe un contrato con estado Nuevo para este empleado. Solo puede existir un contrato con estado Nuevo. Regularize y vuelva a intentar')
 
 
-            dat = self.env['hr.contract'].search([('employee_id', '=', employee_id), ('id', '!=', self.id), 
-            ('date_start', '>=', date_start),('date_end', '=', False)  ])
+            if not date_end:
 
-            if dat:
+
+                dat = self.env['hr.contract'].search([('employee_id', '=', employee_id), ('id', '!=', self.id), 
+                ('date_start', '>=', date_start),('date_end', '=', False)  ])
+
+                if dat:
+                    raise ValidationError(
+                        _('La fecha del contrato se esta intersecando con otro rango de fechas del empleado (%s - %s)' % (dat.date_start, dat.date_end)))
+                    return False
+
+                dat = self.env['hr.contract'].search([('employee_id', '=', employee_id), ('id', '!=', self.id), 
+                ('date_start', '<=', date_start),('date_end', '=', False)  ])
+
+                if dat:
+                    raise ValidationError(
+                        _('Solo puede existir un solo contrato con fecha de fin en blanco. El empleado tiene un contrato con fechas de inicio %s pero no tiene fecha_fin %s' % (dat.date_start, dat.date_end)))
+                    return False
+
+                dat = self.env['hr.contract'].search([('employee_id', '=', employee_id), ('id', '!=', self.id), 
+                ('date_start', '<=', date_start), ('date_end', '>=', date_start)])
+                if dat:
+                    raise ValidationError(
+                        _('La fecha del contrato se esta intersecando con otro rango de fechas del empleado (%s - %s)' % (dat.date_start, dat.date_end)))
+                    return False
+
+            num_row = self.exist_contract_with_id(
+                employee_id, date_start, date_end, self.id)
+
+            if len(num_row) > 0:
                 raise ValidationError(
-                    _('La fecha del contrato se esta intersecando con otro rango de fechas del empleado (%s - %s)' % (dat.date_start, dat.date_end)))
+                    _('La fecha del contrato se esta intersecando con otro rango de fechas del empleado (%s - %s)' % (num_row.date_start, num_row.date_end)))
                 return False
-
-            dat = self.env['hr.contract'].search([('employee_id', '=', employee_id), ('id', '!=', self.id), 
-            ('date_start', '<=', date_start),('date_end', '=', False)  ])
-
-            if dat:
-                raise ValidationError(
-                    _('La fecha del contrato se esta intersecando con otro rango de fechas del empleado (%s - %s)' % (dat.date_start, dat.date_end)))
-                return False
-
-            dat = self.env['hr.contract'].search([('employee_id', '=', employee_id), ('id', '!=', self.id), 
-            ('date_start', '<=', date_start), ('date_end', '>=', date_start)])
-            if dat:
-                raise ValidationError(
-                    _('La fecha del contrato se esta intersecando con otro rango de fechas del empleado (%s - %s)' % (dat.date_start, dat.date_end)))
-                return False
-
-        num_row = self.exist_contract_with_id(
-            employee_id, date_start, date_end, self.id)
-
-        if len(num_row) > 0:
-            raise ValidationError(
-                _('La fecha del contrato se esta intersecando con otro rango de fechas del empleado (%s - %s)' % (num_row.date_start, num_row.date_end)))
-            return False
-        return super(hr_contract, self).write(vals)
+            if 'department_id' in vals:
+                self.employee_id.department_id=vals['department_id']
+            return super(hr_contract, self).write(vals)
+        else:
+            del vals['flag']
+            return super(hr_contract, self).write(vals)
 
     @api.model
     def create(self, vals):
+
+        num_row = self.search([('employee_id','=',vals['employee_id']),('state','=','draft')])
+
+        if len(num_row)>0:
+            raise ValidationError('Ya existe un contrato con estado Nuevo para este empleado.Solo puede existir un contrato con estado Nuevo. Regularize y vuelva a intentar')
 
         num_row = self.exist_contract(
             vals['employee_id'], vals['date_start'], vals['date_end'])
@@ -170,7 +224,9 @@ class hr_contract(models.Model):
             raise ValidationError(
                 _('El empleado ya tiene un contrato en las fechas %s %s ') % (vals['date_start'], vals['date_end']))
             return False
-        return super(hr_contract, self).create(vals)
+        t= super(hr_contract, self).create(vals)
+        t.employee_id.department_id=vals['department_id']
+        return t
 
     @api.multi
     def copy(self, default=None):
@@ -178,3 +234,12 @@ class hr_contract(models.Model):
         default.update({'date_start': '1000-01-01', 'date_end': ''})
         default_return_value = super(hr_contract, self).copy(default)
         return default_return_value
+
+class hr_labor_suspension(models.Model):
+    _name = 'hr.labor.suspension'
+
+    suspension_id = fields.Many2one('hr.contract',readonly=True)
+    tipo_suspension_id = fields.Many2one('planilla.tipo.suspension', string="Tipo suspension")
+    motivo = fields.Char("Motivo")
+    nro_dias = fields.Integer("N° dias")
+    periodos = fields.Many2one('hr.payslip.run','Periodo')

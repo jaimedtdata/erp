@@ -12,3 +12,4 @@ class PlanillaTipoSuspencion(models.Model):
     codigo = fields.Char(string='Codigo')
     descripcion = fields.Text(string='Descripcion')
     descripcion_abrev = fields.Char(string='Descripcion abreviada')
+    ajustes_vacaciones_id = fields.Many2one('planilla.control.vacaciones.ajustes')

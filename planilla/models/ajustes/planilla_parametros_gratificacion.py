@@ -22,9 +22,10 @@ class PlanillaParametrosGratificacion(models.Model):
     cod_bonificacion_9 = fields.Many2one("hr.salary.rule",help="Codigo para bonificacion 9%")
     cod_dias_faltas = fields.Many2one("planilla.worked.days",help="Codigo para dias faltados")
 
-    cod_comisiones = fields.Many2one("hr.salary.rule",help="Codigo para Comisiones")
-    cod_bonificaciones = fields.Many2one("hr.salary.rule",help="Codigo para Bonificaciones")
+    cod_comisiones = fields.Many2many("hr.salary.rule",'param_comi_default_rel',help="Codigo para Comisiones")
+    cod_bonificaciones = fields.Many2many("hr.salary.rule",'param_boni_default_rel',help="Codigo para Bonificaciones")
     cod_sobretiempos = fields.Many2one("hr.salary.rule",help="Codigo para Horas Sobretiempos")
+    cod_wds = fields.Many2many('planilla.worked.days','param_wd_default_rel','param_id','wd_id','Cod Worked Days')
 
     @api.model
     def create(self,vals):

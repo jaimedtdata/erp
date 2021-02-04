@@ -10,7 +10,8 @@ class PlanillaGratificacionLine(models.Model):
 
     planilla_liquidacion_id = fields.Many2one(
         'planilla.liquidacion', "Planilla Liquidacion")
-    employee_id = fields.Integer(index=True)
+    employee_id = fields.Many2one(
+        'hr.employee', "Empleado")
     contract_id =  fields.Many2one(
         'hr.contract', "Planilla Contrato")
     identification_number = fields.Char("Nro Documento", size=9)
@@ -21,6 +22,7 @@ class PlanillaGratificacionLine(models.Model):
     fecha_computable = fields.Date("Fecha Computo")
     fecha_cese = fields.Date("Fecha Cese")
     meses = fields.Integer("Meses")
+    dias = fields.Integer("Dias")
     faltas = fields.Integer("Faltas")
     basico = fields.Float(u"Básico", digits=(10, 2))
     a_familiar = fields.Float("A. Familiar", digits=(10, 2))
@@ -36,3 +38,4 @@ class PlanillaGratificacionLine(models.Model):
     total_gratificacion = fields.Float(u"Total\nGratificación", digits=(10, 2))
     plus_9 = fields.Float(u"Bonif. 9%", digits=(10, 2))
     total = fields.Float(u"Total Pagar", digits=(10, 2))
+    orden = fields.Integer('Orden')

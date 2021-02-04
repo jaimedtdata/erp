@@ -9,7 +9,8 @@ class PlanillaCtsLine(models.Model):
 
     planilla_liquidacion_id = fields.Many2one(
         'planilla.liquidacion', "Planilla Liquidacion")
-    employee_id = fields.Integer(index=True)
+    employee_id = fields.Many2one(
+        'hr.employee', "Empleado")
     contract_id =  fields.Many2one(
         'hr.contract', "Planilla Contrato")
     identification_number = fields.Char("Nro Documento", size=9)
@@ -40,8 +41,13 @@ class PlanillaCtsLine(models.Model):
     cts_a_pagar = fields.Float("CTS a\n Pagar", digits=(10, 2))
     tipo_cambio_venta = fields.Float("Tipo de\nCambio\nVenta", digits=(10, 2))
     cts_dolares = fields.Float("CTS \nDolares", digits=(10, 2))
-    cta_cts = fields.Float("CTA \nCTS", digits=(10, 2))
-    banco = fields.Float("Banco", digits=(10, 2))
+    cta_cts = fields.Char("CTA \nCTS")
+    banco = fields.Many2one(
+        string=u'Banco',
+        comodel_name='res.bank',
+        ondelete='set null',
+    )
+    orden = fields.Integer('Orden')
 
     @api.onchange('cts_soles', 'otros_dtos', 'intereses_cts')
     def _recalcula_cts(self):

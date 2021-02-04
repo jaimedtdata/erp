@@ -3,7 +3,7 @@ from odoo.exceptions import ValidationError
 from odoo.addons.base.res.res_request import referenceable_models
 from datetime import datetime
 from odoo.exceptions import UserError
-
+#FIXME deprecado 09/11/2018
 class PlanillaParametrosEssalud(models.Model):
 
     _name="planilla.parametros.essalud.eps"

@@ -8,8 +8,9 @@
                 <field name="com_fija" />
                 <field name="com_mix" />
                 <field name="prima_s" />
-                <field name="fondo_jib" />
+                <field name="fondo" />
                 <field name="rem_ase" />
+                <field name="account_id"/>
             </tree>
         </field>
     </record>

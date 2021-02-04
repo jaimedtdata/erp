@@ -11,11 +11,14 @@ class PlanillaAjustes(models.Model):
 
     cod_neto_pagar = fields.Many2one("hr.salary.rule")
     cod_remuneracion_asegurable = fields.Many2one("hr.salary.rule")
+    diario_provisiones = fields.Many2one("account.journal",string='Diario para Provisiones')
     cod_dias_laborados = fields.Many2one("planilla.worked.days")
     cod_dias_no_laborados = fields.Many2one("planilla.worked.days")
-    cod_dias_subsidiados = fields.Many2one("planilla.worked.days")
+    cod_dias_subsidiados = fields.Many2many("planilla.worked.days",'settings_worked_days_default_rel','settings_id','wd_id',string="Codigos dias Subsidiados")
     ruc = fields.Char("RUC", default='Asigname valor en ajustes')
     afiliacion_sin_regimen_id = fields.Many2one("planilla.afiliacion")
+    planilla_tabular_columnas = fields.Text("Columnas para planilla tabular")
+    essalud_rules = fields.Many2many('hr.salary.rule','settings_essalud_default_rel','settings_id','rule_id','Reglas Salariales Essalud')
 
     @api.model
     def create(self, vals):
@@ -33,11 +36,11 @@ class PlanillaAjustes(models.Model):
             or not parametros_ajustes.cod_remuneracion_asegurable.code \
             or not parametros_ajustes.cod_dias_laborados.codigo \
             or not parametros_ajustes.cod_dias_no_laborados.codigo \
-            or not parametros_ajustes.cod_dias_subsidiados.codigo \
+            or not parametros_ajustes.cod_dias_subsidiados \
             or not parametros_ajustes.ruc \
             or not parametros_ajustes.afiliacion_sin_regimen_id:
             raise UserError(
-                'Debe crear un registro de ajuste en:  Nomina->Parametros -> Nomina')
+                'Debe crear un registro de ajuste en:  Nomina->Parametros->Parametros Boleta de Pago')
         # if not parametros_ajustes.cod_neto_pagar.code:
         #     raise UserError(
         #         'Debe configurar parametros de gratificacion cod_neto_pagar Nomina->configuracion->parametros gratificacion')
