@@ -10,10 +10,8 @@ class ProjectExt(models.Model):
     show_button_project = fields.Boolean(compute='_get_default_stage_project')
 
     def create_project_ext_bl(self):
+        """Este metodo crea un proyecto enlasado a la oportunidad correpondiente"""
         usuarios = self.env['res.users'].search([])
-        for i in usuarios:
-            print(i.name)
-            print(i.id)
         if not self.project_bl:
             registro = {
             'name':self.name,
@@ -36,12 +34,9 @@ class ProjectExt(models.Model):
         else:
             raise UserError(('Ya existe un proyecto asociado a esta oportunidad.'))
 
-
     @api.one
     def _get_default_stage_project(self):
-        """This method return the status for the procject button"""
-        print("Aqui luis")
-        print(self.env['crm.stage'].search([])[-1])
+        """Este metodo retorna un check para mostrar el boton de crear proyecto"""
         if self.env['crm.stage'].search([])[-1] == self.stage_id:
             self.show_button_project = True
         else:

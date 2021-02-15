@@ -7,10 +7,7 @@ class ProjectExt(models.Model):
     _inherit = 'project.task'
 
     def _get_project_id_domain(self):
-        print(self.project_id)
-        print(self.project_id.means_ext)
         dominio = [(self.id, '=', self.id)]
-        print(dominio)
         return [(self.id, '=', self.id)]
 
     milestone_commercial = fields.Boolean(default=False)

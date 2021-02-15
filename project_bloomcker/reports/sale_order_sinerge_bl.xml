@@ -44,53 +44,164 @@
                         <table class="table table-condensed table-bordered">
                             <thead>
                                 <th class="text-center" style="width: 5%">Item</th>
-                                <th class="text-center" style="width: 45%">Descripción.</th>
-                                <th class="text-center" style="width: 15%">Cant</th>
-                                <th class="text-center" style="width: 15%">UND</th>
+                                <th class="text-center" style="width: 55%">Descripción.</th>
+                                <th class="text-center" style="width: 10%">Cant</th>
+                                <th class="text-center" style="width: 10%">UND</th>
                                 <th class="text-center" style="width: 20%">Precio</th>
                             </thead>
                             <tbody>
-                                <t t-foreach="doc.order_line" t-as="line">
+                                <t t-set="datos" t-value="doc.data_for_order_report_bl()"/>
+                                <t t-set="category" t-value="datos[0]['category']"/>
+                                <tr>
+                                    <td><span>-</span></td>
+                                    <td><strong><t t-esc="category"/></strong></td>
+                                    <td><span>-</span></td>
+                                    <td><span>-</span></td>
+                                    <td><span>-</span></td>
+                                </tr>
+                                <t t-foreach="datos" t-as="line">
+                                    <t t-if="line['category'] != category">
+                                      <tr>
+                                          <td><span>-</span></td>
+                                          <td><strong t-esc="line['category']"/></td>
+                                          <td><span>-</span></td>
+                                          <td><span>-</span></td>
+                                          <td><span>-</span></td>
+                                      </tr>
+                                      <t t-set="category" t-value="line['category']"/>
+                                    </t>
+
                                     <tr>
-                                        <td><span t-esc="line.id"/></td>
-                                        <td><span t-esc="line.name"/></td>
-                                        <td><span t-esc="line.product_uom_qty"/></td>
-                                        <td><span t-esc="line.product_uom.name"/></td>
-                                        <td><span t-esc="line.price_subtotal"/></td>
+                                        <td><span t-esc="line['item']"/></td>
+                                        <td><span t-esc="line['name']"/></td>
+                                        <td><span t-esc="line['cant']"/></td>
+                                        <td><span t-esc="line['und']"/></td>
+                                        <td><span t-esc="line['price']"/></td>
                                     </tr>
                                 </t>
                             </tbody>
                         </table>
 
-                        <!-- <table class="table table-condensed table-bordered">
-                            <thead>
-                                <th class="text-center" style="width: 100%">CUADRO RESUMEN DE TOTALES</th>
-                            </thead>
+                        <table class="table table-condensed table-bordered" style="text-align:center;">
+                            <caption style="text-align:center;">TOTALES</caption>
+                            <tbody>
+                                <tr>
+                                    <td>SUB-TOTAL</td>
+                                    <td>
+                                      <span t-esc="doc.amount_untaxed"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>IMPUESTOS</td>
+                                    <td>
+                                      <span t-esc="doc.amount_tax"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>TOTAL</td>
+                                    <td>
+                                      <span t-esc="doc.amount_total"/>
+                                    </td>
+                                </tr>
+                            </tbody>
                         </table>
 
-                        <table class="table table-condensed table-bordered">
-                            <thead>
-                                <th class="text-center" style="width: 100%">CONDICIONES COMERCIALES</th>
-                            </thead>
+                        <table class="table table-condensed table-bordered" style="text-align:center;">
+                            <caption style="text-align:center;">CONDICIONES COMERCIALES</caption>
+                            <tbody>
+                                <tr>
+                                    <td>Formas de Pago</td>
+                                    <td>
+                                      50% CON LA ORDEN DE COMPRA Y/O FIRMA DEL CONTRATO<br/>
+                                      20% CON LA ENTREGA DE LOS MATERIALES Y EQUIPOS EN OBRA<br/>
+                                      20% CON LA CULMINACION DEL MONTAJE ELECTROMECANICO<br/>
+                                      10% CON LA PUESTA EN SERVICIO - ENERGIZACION<br/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                  <td>TIEMPO DE IMPORTACION TRANSF.</td>
+                                  <td>13-14 SEMANAS</td>
+                                </tr>
+                                <tr>
+                                  <td>TIEMPO DE ENTREGA EQUIPOS NAC.</td>
+                                  <td>05-06 SEMANAS</td>
+                                </tr>
+                                <tr>
+                                  <td>TIEMPO DE MONTAJE ELECTROMEC.</td>
+                                  <td>01 SEMANA</td>
+                                </tr>
+                                <tr>
+                                  <td>TIEMPO DE GARANTIA</td>
+                                  <td>02 AÑOS</td>
+                                </tr>
+                                <tr>
+                                  <td>VALIDEZ DE OFERTA</td>
+                                  <td>15 DIAS</td>
+                                </tr>
+                            </tbody>
                         </table>
 
-                        <table class="table table-condensed table-bordered">
-                            <thead>
-                                <th class="text-center" style="width: 100%">CUENTAS CORRIENTES DE LA EMPRESA</th>
-                            </thead>
+                        <table class="table table-condensed table-bordered" style="text-align:center;">
+                            <caption style="text-align:center;">CUENTAS CORRIENTES DE LA EMPRESA</caption>
+                            <tbody>
+                                <tr>
+                                    <td>BBVA SOLES</td>
+                                    <td>
+                                      0011 0396 0100018165 99
+                                    </td>
+                                </tr>
+                                <tr>
+                                  <td>BBVA DOLARES</td>
+                                  <td>0011 0396 0100018173 93</td>
+                                </tr>
+                                <tr>
+                                  <td>BCP SOLES</td>
+                                  <td>191 2524497 0 68</td>
+                                </tr>
+                                <tr>
+                                  <td>BCP DOLARES</td>
+                                  <td>191 2523131 1 81</td>
+                                </tr>
+                            </tbody>
                         </table>
 
-                        <table class="table table-condensed table-bordered">
-                            <thead>
-                                <th class="text-center" style="width: 100%">CUENTAS INTERBANCARIAS DE LA EMPRESA</th>
-                            </thead>
+                        <table class="table table-condensed table-bordered" style="text-align:center;">
+                            <caption style="text-align:center;">CUENTAS INTERBANCARIAS DE LA EMPRESA</caption>
+                            <tbody>
+                                <tr>
+                                    <td>BBVA SOLES</td>
+                                    <td>
+                                      011 396 000100018165 99
+                                    </td>
+                                </tr>
+                                <tr>
+                                  <td>BBVA DOLARES</td>
+                                  <td>011 396 000100018173 93</td>
+                                </tr>
+                                <tr>
+                                  <td>BCP SOLES</td>
+                                  <td>002 191 002524497068 54</td>
+                                </tr>
+                                <tr>
+                                  <td>BCP DOLARES</td>
+                                  <td>002 191 002523131181 59</td>
+                                </tr>
+                            </tbody>
                         </table>
 
-                        <table class="table table-condensed table-bordered">
-                            <thead>
-                                <th class="text-center" style="width: 100%">CUENTA CORRIENTE DE DETRACCIÓN</th>
-                            </thead>
-                        </table> -->
+                        <table class="table table-condensed table-bordered" style="text-align:center;">
+                            <caption style="text-align:center;">CUENTA CORRIENTE DE DETRACCIÓN</caption>
+                            <tbody>
+                                <tr>
+                                    <td>BANCO DE LA NACION SOLES</td>
+                                    <td>
+                                      00-074-082521
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+
                         <p>
                           NOTAS:<br/>
                           * La presente propuesta se ha elaborado de acuerdo con la información proporcionada por EL CLIENTE y la visita de campo.<br/>
