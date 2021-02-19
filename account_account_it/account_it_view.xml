@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <openerp>
 	<data>
-		
+
 
 
         <record id="view_account_form" model="ir.ui.view">
@@ -18,25 +18,22 @@
                 </field>
 
                 <field name="name" position="after">
-                    <field name="parent_id" />  
-                    <field name="code_sunat" />                 
+                    <field name="parent_id" />
+                    <field name="code_sunat" />
                 </field>
-                <field name="deprecated" position="after">                    
+                <field name="deprecated" position="after">
                     <field name="fefectivo_id" />
                     <field name="tipo_adquisicion_diario" />
                     <field name="patrimony_id" />
-                    <field name="check_moorage" /> 
-                    <field name="account_analytic_account_moorage_debit_id" />    
-                    <field name="account_analytic_account_moorage_id" /> 
+                    <field name="check_moorage" />
+                    <field name="account_analytic_account_moorage_debit_id" />
+                    <field name="account_analytic_account_moorage_id" />
                     <field name="clasification_sheet" required="1" />
-                    <field name="level_sheet" required="1" />   
-                    <field name="cashbank_code" />   
-                    <field name="cashbank_number" />   
+                    <field name="level_sheet" required="1" />
+                    <field name="cashbank_code" />
+                    <field name="cashbank_number" />
                     <field name="cashbank_financy" />
-                    <field name="cuenta_saldo_contable" />                
-
-                    
-
+                    <field name="cuenta_saldo_contable" />
                 </field>
             </field>
         </record>
@@ -57,10 +54,10 @@
                 <form string="Tipo Estado Financiero">
                     <group>
                         <field name="name" required="1"/>
-                        <field name="code" />                        
+                        <field name="code" />
                     </group>
                     <group>
-                        <group>                            
+                        <group>
                             <field name="group_balance"/>
                             <field name="order_balance"/>
                             <field name="group_nature"/>

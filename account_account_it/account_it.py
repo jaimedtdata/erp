@@ -20,7 +20,7 @@ class account_account(models.Model):
 
 	parent_id = fields.Many2one('account.account','Padre')
 
-	tipo_adquisicion_diario = fields.Selection([('1','Mercaderia'),('2','Activo Fijo'),('3','Otros Activo'),('4','Gastos de Educacion, Recreación, Salud, Mantenimiento de Activos'),('5','Otros no incluidos en 4')],'Tipo de Adquisición')	
+	tipo_adquisicion_diario = fields.Selection([('1','Mercaderia'),('2','Activo Fijo'),('3','Otros Activo'),('4','Gastos de Educacion, Recreación, Salud, Mantenimiento de Activos'),('5','Otros no incluidos en 4')],'Tipo de Adquisición')
 	#patrimony_type = fields.Selection([('1','CAPITAL'),('2','CAPITAL ADICIONAL'),('3','PARTI. PATR. TRAB.'),('4','RESERVA LEGAL'),('5','OTRAS RESERVAS'),('6','RESULTADOS ACUMULADOS')],'Tipo Patrimonio Neto')
 	patrimony_id = fields.Many2one('account.patrimony.it','Tipo Patrimonio Neto')
 
@@ -62,7 +62,7 @@ class account_account_type_it(models.Model):
 									('B2','Activo no Corriente'),
 									('B3','Pasivo Corriente'),
 									('B4','Pasivo no Corriente'),
-									('B5','Patrimonio')									
+									('B5','Patrimonio')
 									],'Grupo Balance')
 
 	order_nature = fields.Integer(string='Orden')
@@ -97,6 +97,6 @@ class account_account_type(models.Model):
 		('liquidity', 'Liquidez'),
 	], required=True, default='other')
 
-	
+
 
 

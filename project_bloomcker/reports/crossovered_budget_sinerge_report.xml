@@ -2,7 +2,7 @@
 <openerp>
     <data>
 
-        <template id="crm_lead_compare_sinerge_report">
+        <template id="crossovered_budget_sinerge_report">
             <t t-call="report.html_container">
                 <t t-foreach="docs" t-as="doc">
                     <div class="header" align="center">
@@ -32,29 +32,13 @@
                     <div class="page">
                         <br/>
                         <br/>
-                        <h2 align="center">Comparación entre Cotizaciones</h2><br/>
                         <p align="left">
-                          <strong>Cliente:<span t-esc="doc.partner_id.name"/></strong><br/>
-                          <strong>RUC:<span t-esc="doc.partner_id.ruc_state"/></strong><br/>
-                          <strong>Proyecto:<span t-esc="doc.name"/></strong><br/>
-                        </p><br/>
-                        <table class="table table-condensed table-bordered">
-                            <thead>
-                                <th class="text-center" style="width: 50%">Codigo</th>
-                                <th class="text-center" style="width: 25%">Fecha</th>
-                                <th class="text-center" style="width: 25%">Total de Venta</th>
-                            </thead>
-                            <tbody>
-                                <t t-foreach="doc.order_ids" t-as="line">
-                                    <tr>
-                                        <td><span t-esc="line.name"/></td>
-                                        <td><span t-esc="line.date_order"/></td>
-                                        <td><span t-esc="line.amount_total"/></td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
+                          En atención a su solicitud le hacemos llegar nuestra mejor oferta por lo siguiente:<br/>
+                        </p>
                     </div>
+                    <!-- <div class="footer">
+                        <span>Hola!</span>
+                    </div> -->
                 </t>
             </t>
         </template>

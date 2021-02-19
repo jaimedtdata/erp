@@ -21,6 +21,7 @@
         'reports/sale_order_sinerge_bl.xml',
         'reports/reports_data_bl.xml',
         'reports/compare_report_crm_lead.xml',
+        'reports/crossovered_budget_sinerge_report.xml',
     ],
     "application": True,
 }

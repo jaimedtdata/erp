@@ -29,5 +29,14 @@
                 report_type="qweb-pdf"
         />
 
+        <report
+                string="Presupuesto SINERGE"
+                id="action_report_crossovered_budget_bl"
+                model="crossovered.budget"
+                name="project_bloomcker.crossovered_budget_sinerge_report"
+                file="project_bloomcker.crossovered_budget_sinerge_report"
+                report_type="qweb-pdf"
+        />
+
     </data>
 </openerp>

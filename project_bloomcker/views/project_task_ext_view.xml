@@ -15,7 +15,8 @@
                 <xpath expr="//field[@name='user_id']" position="replace">
                     <field name="milestone_commercial" string="Hito Comercial"/>
                     <!-- domain="[('self.project_id.means_ext', 'in', user_id)]" -->
-                    <field  name="user_id" class="o_task_user_field" options="{&quot;no_open&quot;: True}" />
+                    <field  name="user_id" class="o_task_user_field" options="{&quot;no_open&quot;: True}" domain="[('user_id', 'in', 'means_ext')]"/>
+                    <field name="means_ext" string="Recursos"/>
                 </xpath>
 
             </field>
