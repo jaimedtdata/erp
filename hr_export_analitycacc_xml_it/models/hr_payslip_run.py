@@ -48,7 +48,7 @@ import time
 
 class HrPayslipRun(models.Model):
 	_inherit = ['hr.payslip.run']
-	
+
 	@api.multi
 	def exportar_planilla_tabular_xlsx(self):
 		if len(self.ids) > 1:
@@ -59,7 +59,7 @@ class HrPayslipRun(models.Model):
 
 		try:
 			direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		workbook = Workbook(direccion+'planilla_tabular.xls')
 		worksheet = workbook.add_worksheet(
@@ -127,7 +127,7 @@ class HrPayslipRun(models.Model):
 		worksheet.write(x, 0, header_planilla_tabular[0].field_description, formatLeftColor)
 		for i in range(1, len(header_planilla_tabular)):
 			worksheet.write(x, i, header_planilla_tabular[i].field_description, boldbord)
-		
+
 		worksheet.write(x,i+1,'Aportes ESSALUD',boldbord)
 		worksheet.set_row(x, 50)
 
@@ -137,14 +137,14 @@ class HrPayslipRun(models.Model):
 		filtro = []
 
 		query = 'select %s from planilla_tabular' % (','.join(fields))
-		
+
 		self.env.cr.execute(query)
 		datos_planilla = self.env.cr.fetchall()
 		range_row = len(datos_planilla[0] if len(datos_planilla) > 0 else 0)
 		total_essalud = 0
-		
+
 		for i in range(len(datos_planilla)):
-			print(datos_planilla[i][0])
+			# print(datos_planilla[i][0])
 			for j in range(range_row):
 
 				if j == 0 or j == 1:
@@ -195,7 +195,7 @@ class HrPayslipRun(models.Model):
 			"res_id": sfs_id.id,
 			"target": "new",
 		}
-		
+
 class PlanillaPlanillaTabularWizard(models.TransientModel):
 
     _inherit = "planilla.planilla.tabular.wizard"
@@ -317,7 +317,7 @@ class PlanillaPlanillaTabularWizard(models.TransientModel):
             'state': 'manual',
         })
         etree.SubElement(start_concepts, "field",
-                         name='x_afiliacion_id', sum='x_afiliacion_id')        
+                         name='x_afiliacion_id', sum='x_afiliacion_id')
 
         fields += 'x_contract_id int,'
 
@@ -369,8 +369,8 @@ class PlanillaPlanillaTabularWizard(models.TransientModel):
         fields = fields[:-1] if len(fields) > 0 else fields
         query_pivot_table = """
         SELECT * FROM crosstab(
-            $$ 
-                select 
+            $$
+                select
                 t.name_related as name_related,
                 min(t.identification_id) as identification_id,
                 min(t.entidad) as entidad,
@@ -412,10 +412,10 @@ class PlanillaPlanillaTabularWizard(models.TransientModel):
             ) AS (
             %s
             );
-            
+
         """ % (date_start, date_end,reglas_salariales_search, reglas_salariales_search,fields)
         # ELIMINAR CAMPO fields
-        print(query_pivot_table)
+        # print(query_pivot_table)
         self.env.cr.execute(query_pivot_table)
         data = self.env.cr.dictfetchall()
         for line in data:
