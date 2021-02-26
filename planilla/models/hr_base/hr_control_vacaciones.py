@@ -49,23 +49,26 @@ class HrControlVacaciones(models.Model):
 			devengues = self.env['hr.devengue'].search([('employee_id','=',employee.id)])
 			devengues = devengues.sorted(key=lambda devengue:devengue.periodo_devengue.date_start)
 			for devengue in devengues:
-				year = self.env['account.fiscalyear'].search([('name','=',str(datetime.strptime(devengue.periodo_devengue.date_start,'%Y-%m-%d').year))],limit=1)
-				if year != aux_year:
-					saldo = 30
-				aux_year = year
-				if devengue.dias > 0:
-					self.env['hr.control.vacaciones.line'].create({
-						'fiscalyear_id':year.id,
-						'dni':employee.identification_id,
-						'employee_id':employee.id,
-						'periodo_planilla':devengue.slip_id.payslip_run_id.id,
-						'periodo_devengue':devengue.periodo_devengue.id,
-						'saldo_vacaciones':saldo,
-						'dias_gozados': devengue.dias,
-						'total':saldo - devengue.dias,
-						'control_vacaciones_id':self.id
-					})
-					saldo = saldo - devengue.dias
+				try:
+					year = self.env['account.fiscalyear'].search([('name','=',str(datetime.strptime(devengue.periodo_devengue.date_start,'%Y-%m-%d').year))],limit=1)
+					if year != aux_year:
+						saldo = 30
+					aux_year = year
+					if devengue.dias > 0:
+						self.env['hr.control.vacaciones.line'].create({
+							'fiscalyear_id':year.id,
+							'dni':employee.identification_id,
+							'employee_id':employee.id,
+							'periodo_planilla':devengue.slip_id.payslip_run_id.id,
+							'periodo_devengue':devengue.periodo_devengue.id,
+							'saldo_vacaciones':saldo,
+							'dias_gozados': devengue.dias,
+							'total':saldo - devengue.dias,
+							'control_vacaciones_id':self.id
+						})
+						saldo = saldo - devengue.dias
+				except:
+					pass
 			if saldo == 30:
 				self.env['hr.control.vacaciones.line'].create({
 						'fiscalyear_id':0,
@@ -87,7 +90,7 @@ class HrControlVacaciones(models.Model):
 
 		try:
 			direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		workbook = Workbook(direccion +'control_vacaciones.xlsx')
 		worksheet = workbook.add_worksheet("Vacaciones")
@@ -135,7 +138,7 @@ class HrControlVacaciones(models.Model):
 		worksheet.write(4,5,"SALDO VACACIONES",boldbord)
 		worksheet.write(4,6,"DIAS GOZADOS",boldbord)
 		worksheet.write(4,7,"TOTAL",boldbord)
-		
+
 		x=5
 
 		for line in self.vacaciones_line:
@@ -163,10 +166,10 @@ class HrControlVacaciones(models.Model):
 		workbook.close()
 
 		f = open(direccion + 'control_vacaciones.xlsx', 'rb')
-		
+
 		vals = {
 			'output_name': 'Control_Vacaciones.xlsx',
-			'output_file': base64.encodestring(''.join(f.readlines())),		
+			'output_file': base64.encodestring(''.join(f.readlines())),
 		}
 
 		sfs_id = self.env['planilla.export.file'].create(vals)
@@ -213,7 +216,7 @@ class HrUltimaVacacion(models.Model):
 					'default_employee_ids':[(6,0,ids)]
 				}
 			}
-	
+
 	@api.multi
 	def set_date(self):
 		return [i.write({'fecha_vacacion':self.ultima_vacacion}) for i in self.employee_ids]
@@ -268,7 +271,7 @@ class HrRolVacaciones(models.Model):
 					worked_days += self.env['hr.payslip.worked_days'].search([('payslip_id','=',payslip.id),('code','=','DVAC')]).number_of_days
 					faltas += self.env['hr.payslip.worked_days'].search([('payslip_id','=',payslip.id),('name','=','FALTAS')]).number_of_days
 				dias_efect = worked_days
-				
+
 				if employee.fecha_vacacion or lines:
 					if jornada == 'six':
 						fecha_vac = datetime.strptime(fecha_ult_vac,'%Y-%m-%d') + timedelta(days=days_ult) if dias_efect >= 260 else datetime.strptime(fecha_ult_vac,'%Y-%m-%d') + timedelta(days=days_ult + (260 - dias_efect))
@@ -314,7 +317,7 @@ class HrRolVacaciones(models.Model):
 
 		return self.env['planilla.warning'].info(title='Resultado', message="Se genero de manera correcta")
 		"""
-		year, roles, old_employees, rol = datetime.strptime(self.fiscalyear_id.name,'%Y').year, self.env['hr.rol.vacaciones'].search([]), [], False 
+		year, roles, old_employees, rol = datetime.strptime(self.fiscalyear_id.name,'%Y').year, self.env['hr.rol.vacaciones'].search([]), [], False
 		if filter(lambda rol:datetime.strptime(rol.fiscalyear_id.name,'%Y').year<year,roles):
 			past_year = datetime.strptime(self.fiscalyear_id.name,'%Y') - relativedelta(years=1)
 			past_year = self.env['account.fiscalyear'].search([('name','=',past_year.year)])
@@ -396,14 +399,14 @@ class HrRolVacaciones(models.Model):
 		for line in self.rol_line:
 			f.write(str(line.dni)+"|"+str(line.diferencia)+"\r\n")
 		f.close()
-		f = open(ruta+'rol_diferencias.txt','rb')	
+		f = open(ruta+'rol_diferencias.txt','rb')
 		vals = {
 			'output_name': 'Diferencias_Rol'+(self.fiscalyear_id.name if self.fiscalyear_id else '')+'.txt',
 			'output_file': base64.encodestring(''.join(f.readlines())),
 		}
 
 		sfs_id = self.env['planilla.export.file'].create(vals)
-		
+
 		return {
 			"type": "ir.actions.act_window",
 			"res_model": "planilla.export.file",
@@ -472,7 +475,7 @@ class HrRolVacaciones(models.Model):
 		#worksheet.write(4,7,"DIAS EFECTIVOS",boldbord)
 		#worksheet.write(4,8,"FECHA REAL",boldbord)
 		#worksheet.write(4,9,"DIFERENCIA",boldbord)
-		
+
 		x=5
 
 		for line in self.rol_line:
@@ -502,10 +505,10 @@ class HrRolVacaciones(models.Model):
 		workbook.close()
 
 		f = open(direccion + 'rol_vacaciones'+(self.fiscalyear_id.name if self.fiscalyear_id else '')+'.xlsx', 'rb')
-		
+
 		vals = {
 			'output_name': 'Rol_Vacaciones'+(self.fiscalyear_id.name if self.fiscalyear_id else '')+'.xlsx',
-			'output_file': base64.encodestring(''.join(f.readlines())),		
+			'output_file': base64.encodestring(''.join(f.readlines())),
 		}
 
 		sfs_id = self.env['planilla.export.file'].create(vals)
@@ -532,14 +535,14 @@ class HrRolVacacionesLine(models.Model):
 	#jornada = fields.Integer('Jornada Semanal',help="Jornada Semanal")
 	fecha_ing = fields.Date('Fecha Ingreso')
 	fecha_ult_vac = fields.Date('Fecha Ultima Vacacion')
-	
+
 	@api.depends('fecha_ult_vac')
 	def _get_vac(self):
 		fecha_ult_vac = datetime.strptime(self.fecha_ult_vac,'%Y-%m-%d')
 		self.fecha_vac = date(fecha_ult_vac.year + 1, fecha_ult_vac.month, fecha_ult_vac.day)
 
 	fecha_vac = fields.Date('Fecha Vacaciones',compute="_get_vac",store=True)
-	
+
 	#faltas = fields.Integer('Total Faltas')
 	#dias_efect = fields.Integer('Dias Efectivos')
 	#aux_dias_efect = fields.Integer()
@@ -550,7 +553,7 @@ class HrRolVacacionesLine(models.Model):
 	def write(self,vals):
 		vals['dias_efect'] = self.aux_dias_efect - vals['diferencia']
 		return super(HrRolVacacionesLine,self).write(vals)
-	
+
 	@api.model
 	@api.onchange('diferencia')
 	def get_diference(self):
