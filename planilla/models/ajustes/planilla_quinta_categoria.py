@@ -518,6 +518,8 @@ class quinta_categoria(models.Model):
                 u'No esta configurado los parametros para Quinta Categoria')
 
         config = config[0]
+        print("Luis")
+        print(config)
         nomina = elementos[0]
         employees = []
         for i in nomina.slip_ids:
@@ -532,6 +534,7 @@ class quinta_categoria(models.Model):
                         min(he.id) as employee_id,
                         sum(case when hpl.code = '%s' then hpl.amount else 0 end) as roaq,
                         sum(case when hpl.code = '%s' then hpl.amount else 0 end) as rbq,
+                        sum(case when hpl.code = '%s' then hpl.amount else 0 end) as prograti,
                         sum(case when hpl.code = '%s' then hpl.amount else 0 end) as reaq
                         from hr_payslip hp
                         inner join hr_contract hc on hc.id = hp.contract_id
@@ -546,6 +549,7 @@ class quinta_categoria(models.Model):
                     """%(config.remuneracion_ordinaria_afecta.code,
                         config.remuneracion_basica_quinta.code,
                         config.remuneracion_extraordinaria_afecta.code,
+                        config.remuneracion_extraordinaria_afecta.code,
                         i.payslip_run_id.id,
                         i.employee_id.id)
                     self.env.cr.execute(sql)
@@ -557,11 +561,18 @@ class quinta_categoria(models.Model):
                     remuneracion_ordinaria_afecta = res[0]['roaq']
                     remuneracion_basica_quinta = res[0]['rbq']
                     remuneracion_extraordinaria_afecta = res[0]['reaq']
+                    grati_julio = res[0]['prograti']
+                    print("Hola LM")
+                    print(grati_julio)
+                    # campo_x = res[0]['']
+                    print("Aqui LM")
+                    print(res)
                     if fecha_ini.month >= 7 and fecha_ini.month < 12:
                         gratificacion = self.env['planilla.gratificacion'].search([('year','=',self.periodo.fiscalyear_id.name),('tipo','=','07')])
                         if gratificacion:
                             line = next(iter(filter(lambda l:l.employee_id.id == i.employee_id.id,gratificacion.planilla_gratificacion_lines)),None)
-                            gratificacion_julio = line.total if line else 0
+                            # gratificacion_julio = line.total if line else 0
+                            gratificacion_julio = grati_julio
                         else:
                             gratificacion_julio = 0
                         gratificacion_diciembre = res[0]['gnp']
@@ -569,7 +580,8 @@ class quinta_categoria(models.Model):
                         gratificacion = self.env['planilla.gratificacion'].search([('year','=',self.periodo.fiscalyear_id.name),('tipo','=','07')])
                         if gratificacion:
                             line = next(iter(filter(lambda l:l.employee_id.id == i.employee_id.id,gratificacion.planilla_gratificacion_lines)),None)
-                            gratificacion_julio = line.total if line else 0
+                            # gratificacion_julio = line.total if line else 0
+                            gratificacion_julio = grati_julio
                         else:
                             gratificacion_julio = 0
                         gratificacion = self.env['planilla.gratificacion'].search([('year','=',self.periodo.fiscalyear_id.name),('tipo','=','12')])
@@ -579,7 +591,8 @@ class quinta_categoria(models.Model):
                         else:
                             gratificacion_diciembre = 0
                     else:
-                        gratificacion_julio = res[0]['gfp']
+                        # gratificacion_julio = res[0]['gfp']
+                        gratificacion_julio = grati_julio
                         gratificacion_diciembre = res[0]['gnp']
 
                     respuesta = self.datos_quinta(config, i.employee_id,remuneracion_ordinaria_afecta, remuneracion_extraordinaria_afecta, 
