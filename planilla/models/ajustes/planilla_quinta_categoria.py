@@ -283,7 +283,7 @@ class quinta_categoria(models.Model):
                 if anterior_grat[0].retencion_m_anterior > 0:
                     rtma = anterior_grat[0].retencion_m_anterior
         if remuneracion_m_anterior > 0.0:
-            ant += remuneracion_m_anterior 
+            ant += remuneracion_m_anterior
         uits = self.env['planilla.5ta.uit'].search(
             [('planilla_id', '=', config.id), ('anio', '=', self.periodo.fiscalyear_id.id)])
         if len(uits) == 0:
@@ -419,7 +419,7 @@ class quinta_categoria(models.Model):
                 if len(tmp) > 0:
                     respuesta['retenciones_ant'] -= tmp[0].retencion
             respuesta['retenciones_ant'] -= retencion_m_anterior
-            
+
         elif self.periodo.code.split('/')[0] in ('05', '06', '07'):
             for i_e in range(4):
                 tmp = self.env['quinta.categoria.detalle'].search(
@@ -521,6 +521,11 @@ class quinta_categoria(models.Model):
         nomina = elementos[0]
         employees = []
         for i in nomina.slip_ids:
+            grati_julio = 0
+            for j in i.line_ids:
+                if j.code == "PROGRATI":
+                    grati_julio = j.total
+
             if i.employee_id.id not in employees:
                 if i.contract_id.regimen_laboral_empresa != 'practicante':
                     sql = """
@@ -561,7 +566,8 @@ class quinta_categoria(models.Model):
                         gratificacion = self.env['planilla.gratificacion'].search([('year','=',self.periodo.fiscalyear_id.name),('tipo','=','07')])
                         if gratificacion:
                             line = next(iter(filter(lambda l:l.employee_id.id == i.employee_id.id,gratificacion.planilla_gratificacion_lines)),None)
-                            gratificacion_julio = line.total if line else 0
+                            # gratificacion_julio = line.total if line else 0
+                            gratificacion_julio = grati_julio
                         else:
                             gratificacion_julio = 0
                         gratificacion_diciembre = res[0]['gnp']
@@ -569,7 +575,8 @@ class quinta_categoria(models.Model):
                         gratificacion = self.env['planilla.gratificacion'].search([('year','=',self.periodo.fiscalyear_id.name),('tipo','=','07')])
                         if gratificacion:
                             line = next(iter(filter(lambda l:l.employee_id.id == i.employee_id.id,gratificacion.planilla_gratificacion_lines)),None)
-                            gratificacion_julio = line.total if line else 0
+                            # gratificacion_julio = line.total if line else 0
+                            gratificacion_julio = grati_julio
                         else:
                             gratificacion_julio = 0
                         gratificacion = self.env['planilla.gratificacion'].search([('year','=',self.periodo.fiscalyear_id.name),('tipo','=','12')])
@@ -579,10 +586,11 @@ class quinta_categoria(models.Model):
                         else:
                             gratificacion_diciembre = 0
                     else:
-                        gratificacion_julio = res[0]['gfp']
+                        # gratificacion_julio = res[0]['gfp']
+                        gratificacion_julio = grati_julio
                         gratificacion_diciembre = res[0]['gnp']
 
-                    respuesta = self.datos_quinta(config, i.employee_id,remuneracion_ordinaria_afecta, remuneracion_extraordinaria_afecta, 
+                    respuesta = self.datos_quinta(config, i.employee_id,remuneracion_ordinaria_afecta, remuneracion_extraordinaria_afecta,
                                                 gratificacion_julio, gratificacion_diciembre, 0, 0, 0, 0,remuneracion_basica_quinta)
                     if respuesta[0]:
                         respuesta = respuesta[0]
@@ -670,7 +678,7 @@ class quinta_categoria(models.Model):
                     else:
                         gratificacion_julio = res[0]['gfp']
                         gratificacion_diciembre = res[0]['gnp']
-                    respuesta = self.datos_quinta(config, i.employee_id,remuneracion_ordinaria_afecta, remuneracion_extraordinaria_afecta, 
+                    respuesta = self.datos_quinta(config, i.employee_id,remuneracion_ordinaria_afecta, remuneracion_extraordinaria_afecta,
                                                 gratificacion_julio, gratificacion_diciembre, 0, 0, 0, 0,remuneracion_basica_quinta,True)
                     if respuesta[0]:
                         respuesta = respuesta[0]
@@ -698,7 +706,7 @@ class quinta_categoria(models.Model):
 
         try:
             direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
-        except: 
+        except:
             raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
         workbook = Workbook(direccion +'quinta_categoria.xlsx')
         worksheet = workbook.add_worksheet("Kardex")
@@ -718,7 +726,7 @@ class quinta_categoria(models.Model):
         especial1.set_align('vcenter')
         especial1.set_text_wrap()
         especial1.set_font_size(15)
-        
+
         especial2 = workbook.add_format({'bold': True})
         especial2.set_align('center')
         especial2.set_align('vcenter')
@@ -742,12 +750,12 @@ class quinta_categoria(models.Model):
         bord.set_font_size(8)
         numberdos.set_border(style=1)
         numberdos.set_font_size(8)
-        numbertres.set_border(style=1)          
-        numberseis.set_border(style=1)          
-        numberocho.set_border(style=1)      
-        numberdosbold = workbook.add_format({'num_format':'0.00','bold':True})  
+        numbertres.set_border(style=1)
+        numberseis.set_border(style=1)
+        numberocho.set_border(style=1)
+        numberdosbold = workbook.add_format({'num_format':'0.00','bold':True})
         numberdosbold.set_font_size(8)
-        x= 10               
+        x= 10
         tam_col = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         tam_letra = 1.2
         import sys
@@ -801,11 +809,11 @@ class quinta_categoria(models.Model):
 
         workbook.close()
 
-        
+
         #sfs_obj = self.pool.get('repcontab_base.sunat_file_save')
         vals = {
             'output_name': 'Quinta_Categoria.xlsx',
-            'output_file': open(direccion+"quinta_categoria.xlsx", "rb").read().encode("base64"),     
+            'output_file': open(direccion+"quinta_categoria.xlsx", "rb").read().encode("base64"),
         }
 
         sfs_id = self.env['planilla.export.file'].create(vals)
