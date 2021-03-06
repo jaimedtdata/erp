@@ -21,15 +21,12 @@ class ControlExt(models.Model):
                     if i.saldo_vacaciones > sald_aux:
                         i.employee_id.sald_vacaciones = i.saldo_vacaciones
                         sald_aux = i.saldo_vacaciones
-                        print("Pase uno")
                     else:
                         i.employee_id.sald_vacaciones = sald_aux
-                        print("Pase dos")
                 else:
                     i.employee_id.sald_vacaciones = i.saldo_vacaciones
-                    sald_aux = 0
+                    sald_aux = i.saldo_vacaciones
                     employee_aux = i.employee_id
-                    print("Pase tres")
 
 
             self.vacaciones_line.unlink()
