@@ -40,6 +40,8 @@ class ControlExt(models.Model):
             aux_year = 0
             devengues = self.env['hr.devengue'].search([('employee_id','=',employee.id)])
             devengues = devengues.sorted(key=lambda devengue:devengue.periodo_devengue.date_start)
+            print(employee.name)
+            print(len(devengues))
 
             if len(devengues) == 0:
                 self.env['hr.control.vacaciones.line'].create({
@@ -57,7 +59,7 @@ class ControlExt(models.Model):
                 for devengue in devengues:
                     try:
                         year = self.env['account.fiscalyear'].search([('name','=',str(datetime.strptime(devengue.periodo_devengue.date_start,'%Y-%m-%d').year))],limit=1)
-
+                        
                         if year != aux_year:
                             saldo = employee.sald_vacaciones
                             # saldo = 30
@@ -73,12 +75,12 @@ class ControlExt(models.Model):
                                 'periodo_devengue':devengue.periodo_devengue.id,
                                 'saldo_vacaciones':saldo,
                                 'dias_gozados': devengue.dias,
-                                # 'total':saldo - devengue.dias,
                                 'control_vacaciones_id':self.id
                             })
 
                             saldo = saldo - devengue.dias
                     except:
+                        devengue.unlink()
                         pass
         return self.env['planilla.warning'].info(title='Resultado', message="Se actualizo correctamente")
 

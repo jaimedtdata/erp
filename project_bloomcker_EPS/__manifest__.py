@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
 {
-    "name": """Modulo Bloomcker Repair""",
+    "name": """Modulo Bloomcker EPS""",
     "summary": """Bloomcker""",
-    "description": """Modulo de Corrección""",
+    "description": """Modulo para incluir funsiones EPS""",
     "author": "Luis Millan",
     "depends": [
         "base",
-        "project",
         "planilla"
     ],
     "data": [
-        'security/ir.model.access.csv',
+        'views/eps_base.xml'
     ],
     "application": True,
 }
