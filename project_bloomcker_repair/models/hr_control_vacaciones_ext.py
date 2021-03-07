@@ -40,8 +40,6 @@ class ControlExt(models.Model):
             aux_year = 0
             devengues = self.env['hr.devengue'].search([('employee_id','=',employee.id)])
             devengues = devengues.sorted(key=lambda devengue:devengue.periodo_devengue.date_start)
-            print(employee.name)
-            print(len(devengues))
 
             if len(devengues) == 0:
                 self.env['hr.control.vacaciones.line'].create({
@@ -59,29 +57,28 @@ class ControlExt(models.Model):
                 for devengue in devengues:
                     try:
                         year = self.env['account.fiscalyear'].search([('name','=',str(datetime.strptime(devengue.periodo_devengue.date_start,'%Y-%m-%d').year))],limit=1)
-                        
-                        if year != aux_year:
-                            saldo = employee.sald_vacaciones
-                            # saldo = 30
-
-                        aux_year = year
-                        if devengue.dias > 0:
-                            self.env['hr.control.vacaciones.line'].create({
-                                'fiscalyear_id':year.id,
-                                'dni':employee.identification_id,
-                                'employee_id':employee.id,
-                                'employee_id':employee.id,
-                                'periodo_planilla':devengue.slip_id.payslip_run_id.id,
-                                'periodo_devengue':devengue.periodo_devengue.id,
-                                'saldo_vacaciones':saldo,
-                                'dias_gozados': devengue.dias,
-                                'control_vacaciones_id':self.id
-                            })
-
-                            saldo = saldo - devengue.dias
                     except:
-                        devengue.unlink()
-                        pass
+                        year = self.env['account.fiscalyear'].search([],limit=1)
+
+                    if year != aux_year:
+                        saldo = employee.sald_vacaciones
+                        # saldo = 30
+
+                    aux_year = year
+                    if devengue.dias > 0:
+                        self.env['hr.control.vacaciones.line'].create({
+                            'fiscalyear_id':year.id,
+                            'dni':employee.identification_id,
+                            'employee_id':employee.id,
+                            'employee_id':employee.id,
+                            'periodo_planilla':devengue.slip_id.payslip_run_id.id,
+                            'periodo_devengue':devengue.periodo_devengue.id,
+                            'saldo_vacaciones':saldo,
+                            'dias_gozados': devengue.dias,
+                            'control_vacaciones_id':self.id
+                        })
+
+                        saldo = saldo - devengue.dias
         return self.env['planilla.warning'].info(title='Resultado', message="Se actualizo correctamente")
 
 class CotrolLineExt(models.Model):

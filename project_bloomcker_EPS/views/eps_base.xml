@@ -18,12 +18,17 @@
                         </group>
                         <notebook>
                             <page string="EPS Lineas">
-                                <field name="line_ids"
-
-                                  >
+                                <field name="line_ids">
                                     <tree>
+                                        <field name="dni"/>
                                         <field name="name"/>
+                                        <field name="plan"/>
                                         <field name="period"/>
+                                        <field name="base_afecta"/>
+                                        <field name="aporte_essalud"/>
+                                        <field name="credito_eps"/>
+                                        <field name="costo"/>
+                                        <field name="descuento"/>
                                     </tree>
                                 </field>
                             </page>

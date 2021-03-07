@@ -23,3 +23,11 @@ class EpsLine(models.Model):
     period = fields.Char('Periodo')
     eps_base_id = fields.Many2one('eps.base')
     dni = fields.Integer(string='DNI')
+    employee_id = fields.Many2one('hr.employee','Apellidos y Nombres')
+    plan = fields.Char('Plan')
+    base_afecta = fields.Float("Base Afecta ESSALUD")
+    aporte_essalud = fields.Float("Aporte ESSALUD")
+    credito_eps = fields.Float("Crédito EPS")
+    costo = fields.Float("Costo")
+    descuento = fields.Float("Descuento")
+
