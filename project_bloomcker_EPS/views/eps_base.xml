@@ -5,15 +5,20 @@
             <field name="model">eps.base</field>
             <field name="arch" type="xml">
                 <form string="Control Vacaciones">
-                    <!-- <header>
-                        <button name="calcular_vacaciones" type="object" string="Actualizar" class="oe_highlight"/>
-                        <button name="get_vacaciones_excel" type="object" string="Generar Excel" class="oe_highlight"/>
-                    </header> -->
+                    <header>
+                        <button name="get_lines" type="object" string="Calcular" class="oe_highlight"/>
+                    </header>
                     <sheet>
                         <h1>EPS</h1>
                         <group>
                             <group>
                                 <field name="name" required="1"/>
+                                <field name="nomina" required="1"/>
+                            </group>
+                            <group>
+                                <field name="porcentaje_aporte"/>
+                                <field name="porcentaje_credito"/>
+                                <field name="porcentaje_descuento"/>
                             </group>
                         </group>
                         <notebook>
@@ -21,7 +26,7 @@
                                 <field name="line_ids">
                                     <tree>
                                         <field name="dni"/>
-                                        <field name="name"/>
+                                        <field name="employee_id"/>
                                         <field name="plan"/>
                                         <field name="period"/>
                                         <field name="base_afecta"/>
