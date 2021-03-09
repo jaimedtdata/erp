@@ -9,7 +9,9 @@
         "planilla"
     ],
     "data": [
-        'views/eps_base.xml'
+        'views/eps_base.xml',
+        'views/hr_employee_ext_views.xml',
+        'views/payslip_ext.xml',
     ],
     "application": True,
 }
