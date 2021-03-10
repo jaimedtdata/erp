@@ -1,18 +1,16 @@
 # -*- coding: utf-8 -*-
 {
-    "name": """Modulo Bloomcker EPS""",
+    "name": """Modulo Bloomcker Cuentas Interbancarias""",
     "summary": """Bloomcker""",
-    "description": """Modulo para incluir funsiones EPS""",
+    "description": """Modulo para incluir funsiones de Cuentas Interbancarias""",
     "author": "Luis Millan",
     "depends": [
         "base",
-        "planilla"
+        "account"
     ],
     "data": [
-        'views/eps_base.xml',
+        'views/inter_account_bank_views.xml',
         'views/hr_employee_ext_views.xml',
-        'views/payslip_ext.xml',
-        'views/eps_base.xml',
         'security/ir.model.access.csv',
     ],
     "application": True,
