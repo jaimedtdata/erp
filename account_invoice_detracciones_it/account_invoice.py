@@ -202,7 +202,7 @@ class account_invoice(models.Model):
 	@api.multi
 	def create_detraccion_gastos(self):
 		context = {'invoice_id': self.id,'default_fecha': self.date_invoice ,
-		'default_monto':self.amount_total * float(self.partner_id.porcentaje)/100.0}
+		'default_monto':round(self.amount_total * float(self.partner_id.porcentaje)/100.0,0)}
 		return {
 				'type': 'ir.actions.act_window',
 				'name': "Generar Detracción",

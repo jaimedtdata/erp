@@ -199,7 +199,7 @@ class account_invoice(models.Model):
 
 		if self.type == "out_invoice":
 			context = {'invoice_id': self.id,'default_fecha_cl': self.date_invoice,
-			'default_monto_cl':self.amount_total * float(self.partner_id.porcentaje)/100.0}
+			'default_monto_cl':round(self.amount_total * float(self.partner_id.porcentaje)/100.0,0)}
 			return {
 					'type': 'ir.actions.act_window',
 					'name': "Generar Detracción",
