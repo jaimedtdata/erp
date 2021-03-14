@@ -8,3 +8,4 @@ class PayslipExt(models.Model):
     _inherit = 'hr.payslip'
 
     descuento_eps = fields.Float("Descuento EPS", readonly=True)
+    import_food = fields.Float('Importe Alimentario', related="employee_id.import_food", readonly=True)

@@ -9,3 +9,4 @@ class EmployeeExt(models.Model):
 
     eps_check = fields.Boolean(name="EPS", help="Posee EPS", default=False)
     plan_eps = fields.Char('Plan EPS')
+    import_food = fields.Float('Importe Alimentario', default=0)

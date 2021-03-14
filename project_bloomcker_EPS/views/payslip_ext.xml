@@ -8,6 +8,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='afiliacion_rel']" position="after">
                     <field name="descuento_eps"/>
+                    <field name="import_food"/>
                 </xpath>
             </field>
         </record>
