@@ -8,6 +8,6 @@ class EmployeeExt(models.Model):
     _inherit = 'hr.employee'
 
     eps_check = fields.Boolean(name="EPS", help="Posee EPS", default=False)
-    import_mobility = fields.Boolean(string="Importe por Movilidad", help="Posee Importe por Movilidad?", default=False)
+    import_mobility = fields.Boolean(string="Condición de Trabajo", help="Posee Importe por Movilidad?", default=False)
     plan_eps = fields.Char('Plan EPS')
     import_food = fields.Float('Importe Alimentario', default=0)
