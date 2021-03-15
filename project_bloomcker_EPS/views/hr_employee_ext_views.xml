@@ -8,6 +8,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='user_id']" position="after">
                     <field name="import_food"/>
+                    <field name="import_mobility"/>
                     <field name="eps_check"/>
                     <field name="plan_eps" attrs="{'invisible':[('eps_check', '=' ,False)]}"/>
                 </xpath>
