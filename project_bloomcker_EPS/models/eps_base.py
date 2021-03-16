@@ -47,6 +47,25 @@ class EpsBase(models.Model):
                 }
                 line = self.env['eps.base.line'].create(vals)
 
+    def mod_lines(self):
+
+        compose_form = self.env.ref('project_bloomcker_EPS.eps_line_tree', raise_if_not_found=False)
+        ctx = dict(
+                default_model='eps.base.line',
+                default_eps_base_id=self.id,
+            )
+        return {
+                    'name': 'Lineas de EPS',
+                    'type': 'ir.actions.act_window',
+                    'view_type': 'form',
+                    'view_mode': 'tree,form',
+                    'res_model': 'eps.base.line',
+                    'views': [(compose_form.id, 'tree')],
+                    'view_id': compose_form.id,
+                    # 'target': 'new',
+                    'context': ctx,
+                }
+
 class EpsLine(models.Model):
 
     _name = 'eps.base.line'

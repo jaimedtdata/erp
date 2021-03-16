@@ -7,6 +7,7 @@
                 <form string="Control Vacaciones">
                     <header>
                         <button name="get_lines" type="object" string="Calcular" class="oe_highlight"/>
+                        <button name="mod_lines" type="object" string="Modificar Lineas" class="oe_highlight"/>
                     </header>
                     <sheet>
                         <h1>EPS</h1>
@@ -23,7 +24,7 @@
                         </group>
                         <notebook>
                             <page string="EPS Lineas">
-                                <field name="line_ids">
+                                <field name="line_ids" readonly="1">
                                     <tree>
                                         <field name="dni"/>
                                         <field name="employee_id"/>
@@ -53,6 +54,54 @@
             </field>
         </record>
 
+        <record id="eps_line_form" model="ir.ui.view">
+            <field name="name">eps_line_form_view</field>
+            <field name="model">eps.base.line</field>
+            <field name="arch" type="xml">
+                <form string="Control Vacaciones">
+                    <!-- <header>
+                        <button name="get_lines" type="object" string="Calcular" class="oe_highlight"/>
+                    </header> -->
+                    <sheet>
+                        <h1>EPS Line</h1>
+                        <group>
+                            <group>
+                                <field name="employee_id"/>
+                                <field name="dni"/>
+                                <field name="plan"/>
+                                <field name="period"/>
+                            </group>
+                            <group>
+                                <field name="base_afecta"/>
+                                <field name="aporte_essalud"/>
+                                <field name="credito_eps"/>
+                                <field name="costo"/>
+                                <field name="descuento"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="eps_line_tree" model="ir.ui.view">
+            <field name="name">eps_line_tree_view</field>
+            <field name="model">eps.base.line</field>
+            <field name="arch" type="xml">
+                <tree>
+                  <field name="dni"/>
+                  <field name="employee_id"/>
+                  <field name="plan"/>
+                  <field name="period"/>
+                  <field name="base_afecta"/>
+                  <field name="aporte_essalud"/>
+                  <field name="credito_eps"/>
+                  <field name="costo"/>
+                  <field name="descuento"/>
+                </tree>
+            </field>
+        </record>
+
         <record id="action_eps_base" model="ir.actions.act_window">
             <field name="name">EPS</field>
             <field name="type">ir.actions.act_window</field>
@@ -63,7 +112,19 @@
             <field name="help" type="html"> <p class="oe_view_nocontent_create"> Haga click aqui para ver y configurar los EPS.</p></field>
         </record>
 
+        <record id="action_eps_line" model="ir.actions.act_window">
+            <field name="name">EPS Line</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">eps.base.line</field>
+            <field name="view_id" ref="eps_line_tree"/>
+            <field name="view_type">form</field>
+            <field name="view_mode">tree,form</field>
+            <field name="help" type="html"> <p class="oe_view_nocontent_create"> Haga click aqui para ver y configurar los EPS.</p></field>
+        </record>
+
         <menuitem id="menu_eps_base" name="EPS" parent="planilla.menu_planilla_seccion_contabilidad" action="action_eps_base"/>
+
+        <!-- <menuitem id="menu_eps_line" name="EPS Line" parent="planilla.menu_planilla_seccion_contabilidad" action="action_eps_line"/> -->
 
     </data>
 </odoo>

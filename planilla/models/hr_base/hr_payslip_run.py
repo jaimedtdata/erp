@@ -75,9 +75,9 @@ class HrPayslipRun(models.Model):
 	@api.multi
 	def _wizard_generar_asiento_contable(self):
 
-		query_vista = """  
+		query_vista = """
 			select * from (
-				select 
+				select
 				a6.date_end as fecha_fin,
 				'ASIENTO DISTRIBUIDO DE LA PLANILLA DEL MES':: TEXT as concepto,
 				a7.id as cuenta_debe,
@@ -99,9 +99,9 @@ class HrPayslipRun(models.Model):
 				where a7.code is not null and a1.amount<>0 and a6.date_start='%s' and a6.date_end='%s'
 				group by a6.date_end,a7.id,a10.id
 				order by a7.code)tt
-			union all 
+			union all
 			select * from (
-				select 
+				select
 				a6.date_end as fecha_fin,
 				a5.name as concepto,
 				a7.id as cuenta_haber,
@@ -117,15 +117,15 @@ class HrPayslipRun(models.Model):
 				left join hr_salary_rule a5 on a5.id=a1.salary_rule_id
 				left join hr_payslip_run a6 on a6.id=a2.payslip_run_id
 				left join account_account a7 on a7.id=a5.account_credit
-				where a7.code is not null and a6.date_start='%s' and a6.date_end='%s' 
+				where a7.code is not null and a6.date_start='%s' and a6.date_end='%s'
 					and a1.code not in ('COMFI','COMMIX','SEGI','A_JUB')
 					and a7.code not like '%s'
 				group by a6.date_end,a6.name,a5.name,a7.id,a7.code
 				having sum(a1.amount)<>0
 				order by a7.code)tt
-			union all 
+			union all
 			select * from (
-				select 
+				select
 				hpr.date_end as fecha_fin,
 				pa.entidad||' - '||hpl.code as concepto,
 				pa.account_id as cuenta_haber,
@@ -140,14 +140,14 @@ class HrPayslipRun(models.Model):
 				inner join planilla_afiliacion pa on pa.id = hc.afiliacion_id
 				inner join hr_payslip_run hpr on hpr.id = hp.payslip_run_id
 				inner join hr_salary_rule hsr on hsr.id = hpl.salary_rule_id
-				where pa.account_id is not null and hpr.date_start='%s' and hpr.date_end='%s' 
+				where pa.account_id is not null and hpr.date_start='%s' and hpr.date_end='%s'
 					and hpl.code in ('COMFI','COMMIX','SEGI','A_JUB')
 				group by hpr.date_end,hpr.name,pa.entidad,pa.account_id,hpl.code
 				having sum(hpl.amount)<>0
 			)ttt
 			union all
 			select * from (
-				select 
+				select
 				min(a6.date_end) as fecha_fin,
 				min(a5.name) as concepto,
 				min(a7.id) as cuenta_haber,
@@ -170,20 +170,26 @@ class HrPayslipRun(models.Model):
 				group by rp.id,rp.nro_documento,a7.code
 				having sum(a1.amount)<>0
 				order by a7.code)tt
-					""" % (self.date_start, self.date_end, 
+					""" % (self.date_start, self.date_end,
 						self.date_start, self.date_end, '41%',
 						self.date_start, self.date_end,
 						self.date_start, self.date_end, '41%')
 		self.env.cr.execute(query_vista)
 
 		res = self.env.cr.dictfetchall()
-		
+
 		total_debe = 0
 		total_haber = 0
 		for x in res:
-			total_debe += x['debe']
+			try:
+				total_debe += x['debe']
+			except:
+				total_debe += 0
 		for x in res:
-			total_haber += x['haber']
+			try:
+				total_haber += x['haber']
+			except:
+				total_haber += 0
 		var = total_debe-total_haber
 
 		vals = {
@@ -295,7 +301,7 @@ class HrPayslipRun(models.Model):
 					indemnizacion = payslip.input_line_ids.search(
 						[('payslip_id', '=', payslip.id), ('code', '=', planilla_parametros_liq.cod_indemnizacion.codigo)])
 					indemnizacion.amount = imdenizacion_line.monto
-					
+
 
 		# buscar quita categoria
 
@@ -313,11 +319,11 @@ class HrPayslipRun(models.Model):
 		for row in  quintas_categorias.detalle:
 			payslip = self.buscar_empleado_en_tabla(
 					self.slip_ids, row.empleado)
-			
+
 			if payslip:
 				entrada_quinta = payslip.input_line_ids.search(
 					[('payslip_id', '=', payslip.id), ('code', '=', parametro_quinta_categoria.ingreso_predeterminado.codigo)])
-				entrada_quinta.amount = row.renta_total            
+				entrada_quinta.amount = row.renta_total
 
 		return self.env['planilla.warning'].info(title='Resultado de importacion', message="SE IMPORTO QUINTA CATEGORIA DE MANERA EXITOSA!")
 
@@ -486,7 +492,7 @@ class HrPayslipRun(models.Model):
 		output = io.BytesIO()
 		try:
 			direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		workbook = Workbook(direccion + 'planilla_afp_net.xls')
 		planilla_ajustes = self.env['planilla.ajustes'].search([], limit=1)
@@ -500,15 +506,15 @@ class HrPayslipRun(models.Model):
 					select  hc.cuspp,ptd.codigo_afp as tipo_doc,he.identification_id,he.a_paterno,he.a_materno,he.nombres,
 					case
 						when (hc.date_end isnull or hc.date_end<='%s' or hc.date_end>='%s') then 'S'
-					else 
+					else
 						'N' end as relacion_laboral,
 					case
 						when (hc.date_start between '%s' and '%s') then 'S'
-					else 
+					else
 						'N' end as inicio_relacion_laboral,
 					case
 						when (hc.date_end between '%s' and '%s') then 'S'
-					else 
+					else
 						'N' end as cese_relacion_laboral,
 						hc.excepcion_aportador,
 					(select total from hr_payslip_line
@@ -518,7 +524,7 @@ class HrPayslipRun(models.Model):
 					(SELECT ''::TEXT as aporte_voluntario_empleador),
 					case
 						when (hc.regimen_laboral isnull) then 'N'
-					else 
+					else
 						hc.regimen_laboral end as regimen_laboral
 					from hr_payslip_run hpr
 					inner join hr_payslip p
@@ -670,11 +676,11 @@ class HrPayslipRun(models.Model):
 			raise UserError('Solo se puede mostrar una planilla a la vez, seleccione solo una nomina')
 		output = io.BytesIO()
 		# workbook = Workbook('planilla_plame.xls')
-		
+
 		planilla_ajustes = self.env['planilla.ajustes'].search([], limit=1)
 		try:
 			ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		docname = ruta+'0601%s%s%s.rem' % (
 			self.date_end[:4], self.date_end[5:7], planilla_ajustes.ruc if planilla_ajustes else '')
@@ -746,10 +752,10 @@ class HrPayslipRun(models.Model):
 		planilla_ajustes = self.env['planilla.ajustes'].search([], limit=1)
 		try:
 			ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		docname = ruta+'0601%s%s%s.jor' % (self.date_end[:4], self.date_end[5:7], planilla_ajustes.ruc if planilla_ajustes else '')
-		
+
 		f = open(docname, "w+")
 		for payslip_run in self.browse(self.ids):
 			employees = []
@@ -803,7 +809,7 @@ class HrPayslipRun(models.Model):
 		}
 
 		sfs_id = self.env['planilla.export.file'].create(vals)
-		
+
 		return {
 			"type": "ir.actions.act_window",
 			"res_model": "planilla.export.file",
@@ -824,11 +830,11 @@ class HrPayslipRun(models.Model):
 		planilla_ajustes = self.env['planilla.ajustes'].search([], limit=1)
 		try:
 			ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		file_name = '0601%s%s%s.snl' % (self.date_end[:4], self.date_end[5:7], planilla_ajustes.ruc if planilla_ajustes else '')
 		docname = ruta+file_name
-		
+
 		f = open(docname, "w+")
 
 		for payslip_run in self.browse(self.ids):
@@ -836,7 +842,7 @@ class HrPayslipRun(models.Model):
 			for payslip in payslip_run.slip_ids:
 				if payslip.employee_id.id not in employees:
 					sql = """
-					select 
+					select
 					max(he.identification_id) as dni,
 					max(ptd.codigo_sunat) as sunat_code,
 					pts.codigo as code,
@@ -866,7 +872,7 @@ class HrPayslipRun(models.Model):
 		}
 
 		sfs_id = self.env['planilla.export.file'].create(vals)
-		
+
 		return {
 			"type": "ir.actions.act_window",
 			"res_model": "planilla.export.file",
@@ -887,11 +893,11 @@ class HrPayslipRun(models.Model):
 		planilla_ajustes = self.env['planilla.ajustes'].search([], limit=1)
 		try:
 			ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		file_name = '0601%s%s%s.tas' % (self.date_end[:4], self.date_end[5:7], planilla_ajustes.ruc if planilla_ajustes else '')
 		docname = ruta+file_name
-		
+
 		f = open(docname, "w+")
 
 		for payslip_run in self.browse(self.ids):
@@ -903,7 +909,7 @@ class HrPayslipRun(models.Model):
 						last_contract = max(payslips.mapped('contract_id'),key=lambda c:c['date_start'])
 						sctr = last_contract.sctr if last_contract.sctr else False
 					else:
-						sctr = payslip.contract_id.sctr if payslip.contract_id.sctr else False 
+						sctr = payslip.contract_id.sctr if payslip.contract_id.sctr else False
 					if sctr:
 						cod_sunat = payslip.employee_id.tablas_tipo_documento_id.codigo_sunat if payslip.employee_id.tablas_tipo_documento_id else ''
 						dni = payslip.employee_id.identification_id
@@ -918,7 +924,7 @@ class HrPayslipRun(models.Model):
 		}
 
 		sfs_id = self.env['planilla.export.file'].create(vals)
-		
+
 		return {
 			"type": "ir.actions.act_window",
 			"res_model": "planilla.export.file",
@@ -936,7 +942,7 @@ class HrPayslipRun(models.Model):
 		self.env['planilla.planilla.tabular.wizard'].reconstruye_tabla(self.date_start,self.date_end)
 		try:
 			direccion = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		workbook = Workbook(direccion+'planilla_tabular.xls')
 		worksheet = workbook.add_worksheet(
@@ -1078,7 +1084,7 @@ class HrPayslipRun(models.Model):
 		select hc.id
 		from hr_contract hc
 		inner join hr_employee he on hc.employee_id = he.id
-		where 
+		where
 		(date_end >= '%s' and date_end <= '%s') or
 		(date_start <= '%s' and date_start >='%s'   ) or
 		(
@@ -1171,9 +1177,9 @@ class HrPayslipRun(models.Model):
 	def generar_boletas(self):
 		try:
 			ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
-		
+
 		self.reporteador(True)
 
 		vals = {
@@ -1189,14 +1195,14 @@ class HrPayslipRun(models.Model):
 			"target": "new",
 		}
 
-		
+
 	@api.multi
 	def reporteador(self,option):
 		try:
 			ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
-		
+
 		if option == True:
 			archivo_pdf = SimpleDocTemplate(
 				ruta+"planilla_tmp.pdf", pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=20)
@@ -1258,7 +1264,7 @@ class HrPayslipRun(models.Model):
 					if payslip.employee_id.calendar_id:
 						total = payslip.employee_id.calendar_id.average_hours if payslip.employee_id.calendar_id.average_hours > 0 else 8
 					else:
-						total = 8	
+						total = 8
 
 					#raise UserError(u'El Empleado '+payslip.employee_id.name+' no tiene un Horario establecido.')
 					# formula para los dias laborados segun sunat
@@ -1266,14 +1272,14 @@ class HrPayslipRun(models.Model):
 						total_horas_minutos = modf(int(dias_laborados-dias_faltas)*total)
 					else:
 						total_horas_minutos = modf(sum(payslip.worked_days_line_ids.filtered(lambda l:l.code == planilla_ajustes.cod_dias_laborados.codigo).mapped('number_of_hours')))
-					
+
 					total_horas_jornada_ordinaria = total_horas_minutos[1]
 					total_minutos_jornada_ordinaria = Decimal(str(total_horas_minutos[0] * 60)).quantize(Decimal('1.'), rounding=ROUND_HALF_UP)
 
 					self.genera_boleta_empleado(payslip_run.date_start, payslip_run.date_end, payslips, str(dias_no_laborados), str(dias_laborados), str(total_horas_jornada_ordinaria), str(total_minutos_jornada_ordinaria), (total_sobretiempo), str(dias_subsidiados), elements,
 												company, categories, planilla_ajustes)
 					employees.append(payslip.employee_id.id)
-					
+
 			archivo_pdf.build(elements)
 		else:
 			dic = {
@@ -1289,7 +1295,7 @@ class HrPayslipRun(models.Model):
 			c = 0
 			try:
 				ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
-			except: 
+			except:
 				raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 			# genero boletas por cada payslip seleccionada en el treeview
 			for payslip_run in self.browse(self.ids):  # lotes de nominas
@@ -1322,7 +1328,7 @@ class HrPayslipRun(models.Model):
 					for payslip in payslips:
 						wds = filter(lambda l:l.code in wd_codes and l.payslip_id == payslip,payslip.worked_days_line_ids)
 						dias_subsidiados += sum([int(i.number_of_days) for i in wds])
-					
+
 					query_horas_sobretiempo = '''
 					select sum(number_of_days) as dias ,sum(number_of_hours) as horas ,sum(minutos) as minutos from hr_payslip_worked_days
 					where (code = 'HE25' OR code = 'HE35' or code = 'HE100')
@@ -1365,7 +1371,7 @@ class HrPayslipRun(models.Model):
 	def genera_boleta_empleado(self, date_start, date_end, payslips, dias_no_laborados, dias_laborados, total_horas_jornada_ordinaria, total_minutos_jornada_ordinaria, total_sobretiempo, dias_subsidiados, elements, company, categories, planilla_ajustes):
 		try:
 			ruta = self.env['main.parameter.hr'].search([])[0].dir_create_file
-		except: 
+		except:
 			raise UserError('Falta configurar un directorio de descargas en el menu Configuracion/Parametros/Directorio de Descarga')
 		style_title = ParagraphStyle(
 			name='Center', alignment=TA_LEFT, fontSize=14, fontName="times-roman")
@@ -1403,8 +1409,8 @@ class HrPayslipRun(models.Model):
 		elements.append(Spacer(1, 10))
 
 		colorTitle = colors.Color(
-			red=(197/255.0), green=(217/255.0), blue=(241/255.0))	
-		
+			red=(197/255.0), green=(217/255.0), blue=(241/255.0))
+
 		data = [
 			[Paragraph('RUC: ' + (planilla_ajustes.ruc if planilla_ajustes.ruc else ''), style_cell_left),'', '', '' , Paragraph('Empleador: ' + str(company.name),style_cell_left), '', '',''],
 			[Paragraph('Periodo: ' + date_start + ' - ' + date_end,style_cell_left), '', '', '', '', '', '', '']
@@ -1436,7 +1442,7 @@ class HrPayslipRun(models.Model):
 		contracts = filter(lambda c:c.situacion_id.codigo != '0',empleado.contract_ids)
 		first_contract = min(contracts,key=lambda c:c['date_start']) if contracts else False
 		contract_employee = payslips[0].contract_id
-		
+
 		#if len(contract_employee) > 1:
 		#	raise UserError('El empleado '+empleado.name_related +
 		#					u' tiene más de un contrato activo(Contrato->%s->Informacion->Duracion->date_end)' % empleado.name_related)
@@ -1444,10 +1450,10 @@ class HrPayslipRun(models.Model):
 		row_empleado = [Paragraph(empleado.tablas_tipo_documento_id.descripcion_abrev if empleado.tablas_tipo_documento_id.descripcion_abrev else '', style_cell), Paragraph(empleado.identification_id if empleado.identification_id else '', style_cell), Paragraph(
 			empleado.name_related.strip().title(), style_cell), '', '', '', Paragraph(contract_employee.situacion_id.descripcion_abrev if contract_employee.situacion_id.descripcion_abrev else '', style_cell), '']
 
-		row_empleado_line_4 = [Paragraph(first_contract.date_start if first_contract else '', style_cell), 
-			Paragraph(contract_employee.tipo_trabajador_id.descripcion_abrev.title() if contract_employee.tipo_trabajador_id.descripcion_abrev else '', style_cell), 
-			Paragraph((contract_employee.employee_id.job_id.name if contract_employee.employee_id.job_id else '') if contract_employee.employee_id else '',style_cell), '', 
-			Paragraph(contract_employee.afiliacion_id.entidad if contract_employee.afiliacion_id.entidad else '', style_cell), '', 
+		row_empleado_line_4 = [Paragraph(first_contract.date_start if first_contract else '', style_cell),
+			Paragraph(contract_employee.tipo_trabajador_id.descripcion_abrev.title() if contract_employee.tipo_trabajador_id.descripcion_abrev else '', style_cell),
+			Paragraph((contract_employee.employee_id.job_id.name if contract_employee.employee_id.job_id else '') if contract_employee.employee_id else '',style_cell), '',
+			Paragraph(contract_employee.afiliacion_id.entidad if contract_employee.afiliacion_id.entidad else '', style_cell), '',
 			Paragraph(contract_employee.cuspp if contract_employee.cuspp else '', style_cell), '']
 
 		horas_sobretiempo = int(
@@ -1456,7 +1462,7 @@ class HrPayslipRun(models.Model):
 			total_sobretiempo['minutos']) if total_sobretiempo['minutos'] else 0
 		row_empleado_line_5 = [Paragraph(dias_laborados, style_cell), Paragraph(dias_no_laborados, style_cell), Paragraph(dias_subsidiados, style_cell), Paragraph(
 			dict(empleado._fields['condicion'].selection).get(empleado.condicion), style_cell), Paragraph(total_horas_jornada_ordinaria, style_cell), Paragraph(total_minutos_jornada_ordinaria, style_cell), Paragraph(str(horas_sobretiempo), style_cell), Paragraph(str(minutos_sobretiempo), style_cell)]
-		
+
 		id_periodo = self.env['hr.payslip.run'].search([('date_start','=',date_start)]).id
 		row_empleado_line_6 = ''
 		aux = []
@@ -1531,7 +1537,7 @@ class HrPayslipRun(models.Model):
 			table_style.add('SPAN', (1, x), (4, x))
 			table_style.add('SPAN', (6, x), (7, x))
 			x += 1
-		
+
 		t = Table(data)
 		t.setStyle(table_style)
 
@@ -1549,7 +1555,7 @@ class HrPayslipRun(models.Model):
 			category = categories[j]
 			if category.code == 'APOR_TRA' and training_payslip:
 				ids = [tp.contract_id.id for tp in training_payslip]
-		
+
 			st = ','.join(str(payslip) for payslip in payslips.mapped('contract_id.id') if payslip not in ids)
 			if len(st) < 1:
 				final_st=','.join(str(i) for i in ids)
@@ -1561,7 +1567,7 @@ class HrPayslipRun(models.Model):
 			min(seq) as sequence,
 			sum(total) as total,
 			t.code as code,
-			min(name) as name, 
+			min(name) as name,
 			min(t.cod_sunat) as cod_sunat,
 			min(t.is_ing_or_desc) as is_ing_or_desc
 			from (
@@ -1573,7 +1579,7 @@ class HrPayslipRun(models.Model):
 				case when hc.regimen_laboral_empresa = 'practicante' and hpl.code = 'BAS' then 'Subencion Economica' else hpl.name end as name,
 				sr.cod_sunat as cod_sunat,
 				hsrc.is_ing_or_desc as is_ing_or_desc
-				from hr_payslip hp 
+				from hr_payslip hp
 				inner join hr_payslip_line hpl on hp.id=hpl.slip_id
 				inner join hr_salary_rule as sr on sr.code = hpl.code
 				inner join hr_employee e on e.id = hpl.employee_id
@@ -1608,7 +1614,7 @@ class HrPayslipRun(models.Model):
 				i = i+1
 
 		query_neto_pagar = """
-		select 
+		select
 		min(e.name_related) as name_related,
 		min(e.identification_id) as identification_id,
 		hpl.sequence as sequence,
@@ -1624,12 +1630,12 @@ class HrPayslipRun(models.Model):
 		inner join hr_salary_rule_category hsrc on hsrc.id = hpl.category_id
 		where date_from ='%s'
 			and  date_to='%s'
-			and e.identification_id='%s' 
+			and e.identification_id='%s'
 			and hpl.code='%s'
 			and hpl.contract_id in (%s)
 		group by e.id,hpl.sequence,hpl.code
 		order by e.id,hpl.sequence
-		""" % (date_start, date_end, empleado.identification_id, 
+		""" % (date_start, date_end, empleado.identification_id,
 				planilla_ajustes.cod_neto_pagar.code if planilla_ajustes else '',
 				','.join(str(payslip) for payslip in payslips.mapped('contract_id.id'))
 				)
@@ -1672,7 +1678,7 @@ class HrPayslipRun(models.Model):
 		positions_in_tables = []
 		category = categories[len(categories)-1]
 		reglas_salariales_empleado = """
-		select 
+		select
 		max(e.name_related) as name_related,
 		max(e.identification_id) as identification_id,
 		max(hpl.sequence) as sequence,
